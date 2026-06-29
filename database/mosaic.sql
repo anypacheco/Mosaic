@@ -1,8 +1,8 @@
+DROP DATABASE IF EXISTS Mosaic;
 CREATE DATABASE Mosaic;
-
 USE Mosaic;
 
-CREATE TABLE Workspace (
+CREATE TABLE IF NOT EXISTS Workspace (
     WorkspaceID INT AUTO_INCREMENT,
     WorkspaceName VARCHAR(100) NOT NULL,
     Description TEXT,
@@ -11,14 +11,14 @@ CREATE TABLE Workspace (
     UNIQUE (WorkspaceName)
 );
 
-CREATE TABLE ContentType (
+CREATE TABLE IF NOT EXISTS ContentType (
     ContentTypeID INT AUTO_INCREMENT,
     TypeName VARCHAR(50) NOT NULL,
     PRIMARY KEY(ContentTypeID),
     UNIQUE(TypeName)
 );
 
-CREATE TABLE Workspace_ContentType (
+CREATE TABLE IF NOT EXISTS Workspace_ContentType (
     WorkspaceID INT,
     ContentTypeID INT,
     PRIMARY KEY (WorkspaceID, ContentTypeID),
@@ -29,7 +29,7 @@ CREATE TABLE Workspace_ContentType (
         REFERENCES ContentType(ContentTypeID)
 );
 
-CREATE TABLE Content (
+CREATE TABLE IF NOT EXISTS Content (
     ContentID INT AUTO_INCREMENT,
     WorkspaceID INT NOT NULL,
     ContentTypeID INT NOT NULL,
@@ -54,7 +54,7 @@ CREATE TABLE Content (
     )
 );
 
-CREATE TABLE Tag (
+CREATE TABLE IF NOT EXISTS Tag (
     TagID INT AUTO_INCREMENT,
     WorkspaceID INT NOT NULL,
     Keyword VARCHAR(100) NOT NULL,
@@ -68,7 +68,7 @@ CREATE TABLE Tag (
     CHECK(HexCode IS NULL OR HexCode REGEXP '^#[0-9A-Fa-f]{6}$')
 );
 
-CREATE TABLE Content_Tag (
+CREATE TABLE IF NOT EXISTS Content_Tag (
     ContentID INT,
     TagID INT,
     PRIMARY KEY(ContentID, TagID),
@@ -80,7 +80,7 @@ CREATE TABLE Content_Tag (
         ON DELETE CASCADE
 );
 
-CREATE TABLE Collection (
+CREATE TABLE IF NOT EXISTS Collection (
     CollectionID INT AUTO_INCREMENT,
     WorkspaceID INT NOT NULL,
     CollectionName VARCHAR(100) NOT NULL,
@@ -93,7 +93,7 @@ CREATE TABLE Collection (
     UNIQUE(WorkspaceID, CollectionName)
 );
 
-CREATE TABLE Collection_Content (
+CREATE TABLE IF NOT EXISTS Collection_Content (
     CollectionID INT,
     ContentID INT,
     AddedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -106,7 +106,7 @@ CREATE TABLE Collection_Content (
         ON DELETE CASCADE
 );
 
-CREATE TABLE File_Metadata (
+CREATE TABLE IF NOT EXISTS File_Metadata (
     MetadataID INT AUTO_INCREMENT,
     ContentID INT NOT NULL,
     FileSize BIGINT,
@@ -120,7 +120,7 @@ CREATE TABLE File_Metadata (
     CHECK(FileSize >= 0)
 );
 
-CREATE TABLE Saved_Search (
+CREATE TABLE IF NOT EXISTS Saved_Search (
     SavedSearchID INT AUTO_INCREMENT,
     WorkspaceID INT NOT NULL,
     SearchName VARCHAR(100) NOT NULL,
@@ -132,7 +132,7 @@ CREATE TABLE Saved_Search (
         ON DELETE CASCADE
 );
 
-CREATE TABLE Snapshot (
+CREATE TABLE IF NOT EXISTS Snapshot (
     SnapshotID INT AUTO_INCREMENT,
     WorkspaceID INT NOT NULL,
     SnapshotName VARCHAR(100) NOT NULL,
@@ -144,7 +144,7 @@ CREATE TABLE Snapshot (
         ON DELETE CASCADE
 );
 
-CREATE TABLE Note (
+CREATE TABLE IF NOT EXISTS Note (
     ContentID INT,
     PRIMARY KEY(ContentID),
     FOREIGN KEY(ContentID)
@@ -153,7 +153,7 @@ CREATE TABLE Note (
     CHECK(ContentID > 0)
 );
 
-CREATE TABLE PDF (
+CREATE TABLE IF NOT EXISTS PDF (
     ContentID INT,
     PRIMARY KEY(ContentID),
     FOREIGN KEY(ContentID)
@@ -161,7 +161,7 @@ CREATE TABLE PDF (
         ON DELETE CASCADE
 );
 
-CREATE TABLE Image (
+CREATE TABLE IF NOT EXISTS Image (
     ContentID INT,
     Width INT,
     Height INT,
@@ -173,7 +173,7 @@ CREATE TABLE Image (
     CHECK(Height > 0)
 );
 
-CREATE TABLE AudioVideo (
+CREATE TABLE IF NOT EXISTS AudioVideo (
     ContentID INT,
     DurationSeconds INT,
     PRIMARY KEY(ContentID),
