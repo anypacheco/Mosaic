@@ -19,11 +19,21 @@ WHERE ContentType = 'Markdown';
 SELECT * FROM Content
 WHERE WorkspaceID = 1;
 
--- Find tags containing 'innovation'
-SELECT * FROM Tag
-WHERE TagName = 'innovation';
+-- Find content that's larger than 500 MB
+SELECT ContentID FROM File_Metadata
+WHERE FileSize > 524288000;
 
 -- SUMMARY Queries
+
+DESCRIBE Workspace;
+DESCRIBE Content;
+DESCRIBE Tag;
+DESCRIBE File_Metadata;
+DESCRIBE Content_Search_Index;
+DESCRIBE Collection;
+DESCRIBE Saved_Search;
+DESCRIBE Snapshot;
+
 -- Count content per workspace
 SELECT WorkspaceID, COUNT(*) AS TotalContent
 FROM Content
