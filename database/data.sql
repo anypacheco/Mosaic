@@ -57,7 +57,7 @@ INSERT INTO Content (WorkspaceID, ContentTypeID, Name, TextContent, FilePath, De
 
 -- Personal
 (1,1,'Morning Reflection','Thoughts on clarity and intention',NULL,'Journal entry'),
-(1,1,'Poem: Glass Light','Fragmented poetic writing',NULL,'Poetry draft'),
+(1,1,'Poem: Moonlight','Poetic writing',NULL,'Poetry draft'),
 (1,2,'Growth Notes',NULL,'/files/personal/growth.pdf','Self development PDF'),
 (1,3,'Dream Collage',NULL,'/files/personal/dream.png','Visual subconscious board'),
 (1,4,'Ambient Loop',NULL,'/files/personal/ambient.mp3','Experimental sound'),

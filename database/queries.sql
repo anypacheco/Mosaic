@@ -19,9 +19,9 @@ WHERE ContentType = 'Markdown';
 SELECT * FROM Content
 WHERE WorkspaceID = 1;
 
--- Find tags containing 'love'
+-- Find tags containing 'innovation'
 SELECT * FROM Tag
-WHERE TagName = 'love';
+WHERE TagName = 'innovation';
 
 -- SUMMARY Queries
 -- Count content per workspace
