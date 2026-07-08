@@ -7,20 +7,6 @@ INSERT INTO Workspace (WorkspaceName, Description) VALUES
 ('School', 'Academic learning and research'),
 ('Side Projects', 'Creative startups and artistic exploration');
 
--- CONTENT TYPES
-INSERT INTO ContentType (TypeName) VALUES
-('Note'),
-('PDF'),
-('Image'),
-('AudioVideo');
-
--- WORKSPACE CONTENT TYPES
-INSERT INTO Workspace_ContentType VALUES
-(1,1),(1,2),(1,3),(1,4),
-(2,1),(2,2),(2,3),(2,4),
-(3,1),(3,2),(3,3),(3,4),
-(4,1),(4,2),(4,3),(4,4);
-
 -- TAGS (WITH HEX COLORS)
 INSERT INTO Tag (WorkspaceID, TagName, HexColor) VALUES
 
@@ -53,49 +39,35 @@ INSERT INTO Tag (WorkspaceID, TagName, HexColor) VALUES
 (4,'Branding','#FEFAE0');
 
 -- CONTENT
-INSERT INTO Content (WorkspaceID, ContentTypeID, Name, TextContent, FilePath, Description) VALUES
+-- Note: ContentType uses ENUM string literals ('Markdown','PDF','Image','Audio','Video')
+
+INSERT INTO Content (WorkspaceID, Title, ContentType, TextContent, FilePath, Description) VALUES
 
 -- Personal
-(1,1,'Morning Reflection','Thoughts on clarity and intention',NULL,'Journal entry'),
-(1,1,'Poem: Moonlight','Poetic writing',NULL,'Poetry draft'),
-(1,2,'Growth Notes',NULL,'/files/personal/growth.pdf','Self development PDF'),
-(1,3,'Dream Collage',NULL,'/files/personal/dream.png','Visual subconscious board'),
-(1,4,'Ambient Loop',NULL,'/files/personal/ambient.mp3','Experimental sound'),
+(1, 'Morning Reflection', 'Markdown', 'Thoughts on clarity and intention', NULL, 'Journal entry'),
+(1, 'Poem: Moonlight', 'Markdown', 'Poetic writing', NULL, 'Poetry draft'),
+(1, 'Growth Notes', 'PDF', NULL, '/files/personal/growth.pdf', 'Self development PDF'),
+(1, 'Dream Collage', 'Image', NULL, '/files/personal/dream.png', 'Visual subconscious board'),
+(1, 'Ambient Loop', 'Audio', NULL, '/files/personal/ambient.mp3', 'Experimental sound'),
 
 -- Work
-(2,1,'Sprint Planning','Team roadmap and priorities',NULL,'Agile notes'),
-(2,2,'System Design',NULL,'/files/work/system.pdf','Architecture document'),
-(2,3,'UI Mockups',NULL,'/files/work/ui.png','Interface designs'),
-(2,4,'Team Presentation',NULL,'/files/work/pitch.mp4','Recorded meeting'),
+(2, 'Sprint Planning', 'Markdown', 'Team roadmap and priorities', NULL, 'Agile notes'),
+(2, 'System Design', 'PDF', NULL, '/files/work/system.pdf', 'Architecture document'),
+(2, 'UI Mockups', 'Image', NULL, '/files/work/ui.png', 'Interface designs'),
+(2, 'Team Presentation', 'Video', NULL, '/files/work/pitch.mp4', 'Recorded meeting'),
 
 -- School
-(3,1,'AI Lecture Notes','Machine learning concepts',NULL,'Study notes'),
-(3,2,'AI Ethics Paper',NULL,'/files/school/ai.pdf','Research paper'),
-(3,3,'Lab Diagram',NULL,'/files/school/lab.png','Scientific diagram'),
-(3,4,'Recorded Lecture',NULL,'/files/school/lecture.mp4','Class recording'),
+(3, 'AI Lecture Notes', 'Markdown', 'Machine learning concepts', NULL, 'Study notes'),
+(3, 'AI Ethics Paper', 'PDF', NULL, '/files/school/ai.pdf', 'Research paper'),
+(3, 'Lab Diagram', 'Image', NULL, '/files/school/lab.png', 'Scientific diagram'),
+(3, 'Recorded Lecture', 'Video', NULL, '/files/school/lecture.mp4', 'Class recording'),
 
 -- Side Projects
-(4,1,'Startup Idea','AI creative assistant concept',NULL,'Ideation'),
-(4,2,'Brand Guide',NULL,'/files/side/brand.pdf','Identity system'),
-(4,3,'Logo Concepts',NULL,'/files/side/logo.png','Design iterations'),
-(4,4,'Pitch Audio',NULL,'/files/side/pitch.mp3','Investor narration');
+(4, 'Startup Idea', 'Markdown', 'AI creative assistant concept', NULL, 'Ideation'),
+(4, 'Brand Guide', 'PDF', NULL, '/files/side/brand.pdf', 'Identity system'),
+(4, 'Logo Concepts', 'Image', NULL, '/files/side/logo.png', 'Design iterations'),
+(4, 'Pitch Audio', 'Audio', NULL, '/files/side/pitch.mp3', 'Investor narration');
 
--- CONTENT SUBTYPES
-INSERT INTO Note VALUES (1),(2),(6),(10),(11),(14);
-
-INSERT INTO PDF VALUES (3),(7),(12),(15);
-
-INSERT INTO Image VALUES
-(4,1920,1080),
-(8,1200,800),
-(13,2480,3508),
-(16,2000,2000);
-
-INSERT INTO AudioVideo VALUES
-(5,180),
-(9,900),
-(14,3600),
-(17,240);
 
 -- FILE METADATA
 INSERT INTO File_Metadata (ContentID, FileSize, FileExtension, ExtractedTextAvailable) VALUES
@@ -124,7 +96,7 @@ INSERT INTO Collection (WorkspaceID, CollectionName, Description) VALUES
 (4,'Brand Identity','Design systems');
 
 -- COLLECTION CONTENT
-INSERT INTO Collection_Content VALUES
+INSERT INTO Collection_Content (CollectionID, ContentID) VALUES
 (1,1),(1,2),
 (2,5),
 (3,7),(3,8),
@@ -135,7 +107,7 @@ INSERT INTO Collection_Content VALUES
 (8,16),(8,17);
 
 -- CONTENT TAGS
-INSERT INTO Content_Tag VALUES
+INSERT INTO Content_Tag (ContentID, TagID) VALUES
 (1,1),(1,2),
 (2,1),
 (3,1),(3,4),
@@ -157,21 +129,21 @@ INSERT INTO Content_Tag VALUES
 (16,16),
 
 (17,17),
-(18,18);
+(17,18);
 
 -- SAVED SEARCHES
 INSERT INTO Saved_Search (WorkspaceID, SearchName, ContentType) VALUES
-(1,'Writing','Note'),
-(1,'Audio Works','AudioVideo'),
+(1,'Writing','Markdown'),
+(1,'Audio Works','Audio'),
 (2,'Design Docs','PDF'),
 (3,'Research Papers','PDF'),
 (4,'Brand Assets','Image'),
-(4,'Pitch Audio','AudioVideo');
+(4,'Pitch Audio','Audio');
 
 -- SAVED SEARCH TAGS
-INSERT INTO SavedSearch_Tag VALUES
+INSERT INTO SavedSearch_Tag (SavedSearchID, TagID) VALUES
 (1,1),(1,2),
-(2,1),
+(2,5),
 (3,9),
 (4,11),
 (5,17),
@@ -185,7 +157,7 @@ INSERT INTO Snapshot (WorkspaceID, SnapshotName, SnapshotTime) VALUES
 (4,'Startup Phase','2026-01-07 11:00:00');
 
 -- SNAPSHOT CONTENT
-INSERT INTO Snapshot_Content VALUES
+INSERT INTO Snapshot_Content (SnapshotID, ContentID) VALUES
 (1,1),(1,2),(1,4),
 (2,6),(2,7),(2,9),
 (3,10),(3,11),(3,12),

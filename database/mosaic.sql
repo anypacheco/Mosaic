@@ -29,7 +29,9 @@ CREATE TABLE Content (
     ContentID INT AUTO_INCREMENT,
     WorkspaceID INT NOT NULL,
     Title VARCHAR(255) NOT NULL,
-    FilePath VARCHAR(500) NOT NULL,
+    FilePath VARCHAR(500),
+	TextContent TEXT,
+	Description TEXT,
     ContentType ENUM('Markdown','PDF','Image','Audio','Video') NOT NULL,
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     ModifiedAt DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -39,7 +41,7 @@ CREATE TABLE Content (
         REFERENCES Workspace(WorkspaceID)
         ON DELETE CASCADE,
     UNIQUE (WorkspaceID, Title),
-    UNIQUE (WorkspaceID, FilePath)
+    CHECK (FilePath IS NOT NULL OR TextContent IS NOT NULL)
 );
 
 CREATE TABLE Tag (
