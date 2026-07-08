@@ -1,18 +1,21 @@
-function Workspace() {
+import SearchBar from "../components/SearchBar";
+import GraphView from "../components/GraphView";
+import MosaicView from "../components/MosaicView";
+
+type WorkspaceProps = {
+  currentView: "graph" | "mosaic";
+};
+
+function Workspace({ currentView }: WorkspaceProps) {
   return (
     <main className="workspace">
-      <div className="search-box">
-        <input placeholder="Search tags or content..." />
-        <span className="divider"></span>
-        <button className="star-button">☆</button>
-        <button className="saved-button">Saved Searches</button>
-      </div>
+      <SearchBar />
 
-      <section className="workspace-title">
-        <p>Mosaic of Tesserae</p>
+      <section className="graph-container">
+        {currentView === "graph" ? <GraphView /> : <MosaicView />}
+
+        <button className="add-tessera">+ Add Tessera</button>
       </section>
-
-      <button className="add-button">＋ Add Tessera</button>
     </main>
   );
 }
