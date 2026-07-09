@@ -4,7 +4,7 @@ Mosaic is a database app that allows users to store various types of source mate
 
 ## Software Used
 
-* Database System: SQLite
+* Database System: MySQL
 * User Interface: React + TypeScript
 * Backend Framework: Node.js + Express (Express makes it easier to create routes and handle requests)
 
