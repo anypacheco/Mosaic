@@ -1,19 +1,18 @@
 import { useState } from "react";
-import { workspaces, snapshots } from "../data/mockData";
+import { useWorkspace } from "../context/WorkspaceContext";
 
 type TopbarProps = {
-  filesOpen: boolean;
   onToggleFiles: () => void;
 };
 
-function Topbar({ filesOpen, onToggleFiles }: TopbarProps) {
-  const [timelineOpen, setTimelineOpen] = useState(false);
-  const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const [currentWorkspace, setCurrentWorkspace] = useState(workspaces[0]);
+function Topbar({ onToggleFiles }: TopbarProps) {
+  const { workspaces, currentWorkspace, setCurrentWorkspace, snapshots } = useWorkspace();
 
-  const latestSnapshot = snapshots
-    .filter((snapshot) => snapshot.WorkspaceID === currentWorkspace.WorkspaceID)
-    .at(-1);
+  const [timelineOpen, setTimelineOpen] =useState(false);
+  const [workspaceOpen, setWorkspaceOpen]=useState(false);
+
+  // snapshots in context already belong to the current workspace
+  const latestSnapshot = snapshots.length>0 ? snapshots[snapshots.length-1] : undefined;
 
   return (
     <header className="topbar">
@@ -24,7 +23,7 @@ function Topbar({ filesOpen, onToggleFiles }: TopbarProps) {
           className="workspace-select"
           onClick={() => setWorkspaceOpen(!workspaceOpen)}
         >
-          <span>{currentWorkspace.WorkspaceName}</span>
+          <span>{currentWorkspace ? currentWorkspace.WorkspaceName : "..."}</span>
           <span className="chevron">{workspaceOpen ? "▾" : "▸"}</span>
         </button>
 
@@ -69,7 +68,11 @@ function Topbar({ filesOpen, onToggleFiles }: TopbarProps) {
             <div className="timeline-dropdown">
               <div className="timeline-meta">
                 <span>Last Snapshot</span>
-                <p>{latestSnapshot ? latestSnapshot.SnapshotTime : "No snapshots yet"}</p>
+                <p>
+                  {latestSnapshot
+                    ? latestSnapshot.SnapshotTime
+                    : "No snapshots yet"}
+                </p>
               </div>
 
               <div className="dropdown-divider" />
@@ -79,6 +82,7 @@ function Topbar({ filesOpen, onToggleFiles }: TopbarProps) {
             </div>
           )}
         </div>
+
 
         <button className="menu-button" onClick={onToggleFiles}>
           ☰

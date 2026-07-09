@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { tags, content, collections } from "../data/mockData";
+import { useWorkspace } from "../context/WorkspaceContext";
+
+import { createTag as apiCreateTag, type Tag } from "../api/client";
 
 function SearchBar() {
+  const { tags, content, collections, currentWorkspace }=useWorkspace();
+
   const [open, setOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [selectedTags, setSelectedTags] = useState<typeof tags>([]);
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    function handleClickOutside(event: MouseEvent) 
+	{
       if (
         wrapperRef.current &&
         !wrapperRef.current.contains(event.target as Node)
@@ -30,37 +35,37 @@ function SearchBar() {
       tag.TagName.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const matchingContent = content.filter((item) =>
-    item.Title.toLowerCase().includes(searchText.toLowerCase())
+  const matchingContent = content.filter((item) =>item.Title.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const matchingCollections = collections.filter((collection) =>
-    collection.CollectionName.toLowerCase().includes(searchText.toLowerCase())
+  const matchingCollections = collections.filter((collection) => collection.CollectionName.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const addTag = (tag: (typeof tags)[number]) => {
+  const addTag = (tag: Tag) => {
     setSelectedTags([...selectedTags, tag]);
     setSearchText("");
     setOpen(true);
   };
 
   const removeTag = (tagId: number) => {
-    setSelectedTags(selectedTags.filter((tag) => tag.TagID !== tagId));
+    setSelectedTags(selectedTags.filter((tag) => tag.TagID!== tagId));
   };
 
-  const createTag = () => {
-    if (searchText.trim() === "") return;
+  const createTag = async () => {
+    if (searchText.trim() === "" || !currentWorkspace) return;
 
-    const newTag = {
-      TagID: Date.now(),
-      WorkspaceID: 1,
-      TagName: searchText.trim(),
-      HexColor: "#9B5DE5",
-    };
-
-    setSelectedTags([...selectedTags, newTag]);
-    setSearchText("");
-    setOpen(true);
+    try {
+      const newTag = await apiCreateTag({
+        WorkspaceID: currentWorkspace.WorkspaceID,
+        TagName: searchText.trim(),
+        HexColor: "#9B5DE5",
+      });
+      setSelectedTags([...selectedTags, newTag]);
+      setSearchText("");
+      setOpen(true);
+    } catch (err) {
+      console.error("Failed to create tag:", err);
+    }
   };
 
   return (
