@@ -121,6 +121,26 @@ app.get('/api/content/:id', async (req, res) => {
     }
 });
 
+// GET collections associated with content
+app.get('/api/content/:contentId/collections', async (req, res) => {
+    try {
+        const { contentId } = req.params;
+
+        const collections = await db.query(
+            `SELECT col.* FROM Collection col
+             JOIN Collection_Content cc ON col.CollectionID = cc.CollectionID
+             WHERE cc.ContentID = ?
+             ORDER BY col.CollectionName`,
+            [contentId]
+        );
+
+        res.json(collections);
+    } catch (error) {
+        console.error('Error fetching content collections:', error);
+        res.status(500).json({ error: 'Failed to fetch content collections' });
+    }
+});
+
 // POST create new content
 app.post('/api/content', async (req, res) => {
     try {
@@ -193,7 +213,7 @@ app.post('/api/content/:contentId/tags/:tagId', async (req, res) => {
     try {
         const { contentId, tagId } = req.params;
         await db.query(
-            'INSERT INTO Content_Tag (ContentID, TagID) VALUES (?, ?)',
+            'INSERT IGNORE INTO Content_Tag (ContentID, TagID) VALUES (?, ?)',
             [contentId, tagId]
         );
 
@@ -257,6 +277,40 @@ app.get('/api/collections/:id/content', async (req, res) => {
 	{
         console.error('Error fetching collection content:', error);
         res.status(500).json({ error: 'Failed to fetch collection content' });
+    }
+});
+
+// POST add content to a collection
+app.post('/api/collections/:collectionId/content/:contentId', async (req, res) => {
+    try {
+        const { collectionId, contentId } = req.params;
+
+        await db.query(
+            'INSERT IGNORE INTO Collection_Content (CollectionID, ContentID) VALUES (?, ?)',
+            [collectionId, contentId]
+        );
+
+        res.status(201).json({ CollectionID: collectionId, ContentID: contentId });
+    } catch (error) {
+        console.error('Error adding content to collection:', error);
+        res.status(500).json({ error: 'Failed to add content to collection' });
+    }
+});
+
+// DELETE remove content from a collection
+app.delete('/api/collections/:collectionId/content/:contentId', async (req, res) => {
+    try {
+        const { collectionId, contentId } = req.params;
+
+        await db.query(
+            'DELETE FROM Collection_Content WHERE CollectionID = ? AND ContentID = ?',
+            [collectionId, contentId]
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error removing content from collection:', error);
+        res.status(500).json({ error: 'Failed to remove content from collection' });
     }
 });
 
@@ -384,7 +438,7 @@ async function startServer() {
         console.log('Initializing database...');
         await db.initializeDatabase();
 		
-        console.log('✓ Database initialized successfully');
+        console.log('Database initialized successfully');
 
         app.listen(PORT, () => {
             console.log(`Mosaic server running on http://localhost:${PORT}`);

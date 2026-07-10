@@ -1,12 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import { collections, content, contentTags, tags } from "../data/mockData";
+import { useWorkspace } from "../context/WorkspaceContext";
+import { createTag as apiCreateTag, type Collection, type Content, type Tag } from "../api/client";
+
+const API_BASE = "http://localhost:3000";
 
 type TesseraDetailProps = {
-  tessera: (typeof content)[number];
-  collection?: (typeof collections)[number];
+  tessera: Content;
+  collection?: Collection;
   onClose: () => void;
   onRemoveFromCollection: () => void;
 };
+
+async function apiRequest(path: string, options?: RequestInit) {
+  const response = await fetch(`${API_BASE}${path}`, options);
+
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+
+  return response.json();
+}
 
 function TesseraDetail({
   tessera,
@@ -14,11 +27,14 @@ function TesseraDetail({
   onClose,
   onRemoveFromCollection,
 }: TesseraDetailProps) {
+  const { tags, collections, refreshWorkspaceData } = useWorkspace();
+
   const [description, setDescription] = useState(tessera.Description || "");
   const [markdownContent, setMarkdownContent] = useState(
     tessera.TextContent || ""
   );
   const [contentWarning, setContentWarning] = useState("");
+  const [propertyWarning, setPropertyWarning] = useState("");
 
   const [editingTags, setEditingTags] = useState(false);
   const [editingCollections, setEditingCollections] = useState(false);
@@ -28,16 +44,36 @@ function TesseraDetail({
   const tagsPickerRef = useRef<HTMLDivElement>(null);
   const collectionsPickerRef = useRef<HTMLDivElement>(null);
 
-  const [selectedTags, setSelectedTags] = useState(
-    contentTags
-      .filter((link) => link.ContentID === tessera.ContentID)
-      .map((link) => tags.find((tag) => tag.TagID === link.TagID))
-      .filter(Boolean) as typeof tags
-  );
-
-  const [selectedCollections, setSelectedCollections] = useState(
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  const [selectedCollections, setSelectedCollections] = useState<Collection[]>(
     collection ? [collection] : []
   );
+
+  useEffect(() => {
+    async function loadTesseraRelationships() {
+      try {
+        const tesseraWithTags = await apiRequest(
+          `/api/content/${tessera.ContentID}`
+        );
+
+        setSelectedTags(tesseraWithTags.tags || []);
+
+        try {
+          const loadedCollections = await apiRequest(
+            `/api/content/${tessera.ContentID}/collections`
+          );
+
+          setSelectedCollections(loadedCollections);
+        } catch {
+          setSelectedCollections(collection ? [collection] : []);
+        }
+      } catch (err) {
+        console.error("Failed to load tessera relationships:", err);
+      }
+    }
+
+    loadTesseraRelationships();
+  }, [tessera.ContentID, collection]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -82,41 +118,113 @@ function TesseraDetail({
     (tag) => tag.TagName.toLowerCase() === tagSearch.trim().toLowerCase()
   );
 
-  const addTag = (tag: (typeof tags)[number]) => {
-    setSelectedTags([...selectedTags, tag]);
-    setTagSearch("");
+  const addTag = async (tag: Tag) => {
+    try {
+      await apiRequest(`/api/content/${tessera.ContentID}/tags/${tag.TagID}`, {
+        method: "POST",
+      });
+
+      setSelectedTags([...selectedTags, tag]);
+      setTagSearch("");
+      setPropertyWarning("");
+      await refreshWorkspaceData();
+    } catch (err) {
+      console.error("Failed to add tag:", err);
+      setPropertyWarning("Failed to add tag. Please try again.");
+    }
   };
 
-  const createTag = () => {
+  const createTag = async () => {
     if (tagSearch.trim() === "") return;
 
-    const newTag = {
-      TagID: Date.now(),
-      WorkspaceID: tessera.WorkspaceID,
-      TagName: tagSearch.trim(),
-      HexColor: "#9B5DE5",
-    };
-
-    setSelectedTags([...selectedTags, newTag]);
-    setTagSearch("");
-  };
-
-  const removeTag = (tagId: number) => {
-    setSelectedTags(selectedTags.filter((tag) => tag.TagID !== tagId));
-  };
-
-  const addCollection = (newCollection: (typeof collections)[number]) => {
-    setSelectedCollections([...selectedCollections, newCollection]);
-    setCollectionSearch("");
-  };
-
-  const removeCollection = (collectionId: number) => {
-    setSelectedCollections(
-      selectedCollections.filter((item) => item.CollectionID !== collectionId)
+    const existingTag = tags.find(
+      (tag) => tag.TagName.toLowerCase() === tagSearch.trim().toLowerCase()
     );
 
-    if (collection?.CollectionID === collectionId) {
-      onRemoveFromCollection();
+    if (existingTag) {
+      await addTag(existingTag);
+      return;
+    }
+
+    try {
+      const newTag = await apiCreateTag({
+        WorkspaceID: tessera.WorkspaceID,
+        TagName: tagSearch.trim(),
+        HexColor: "#9B5DE5",
+      });
+
+      await apiRequest(
+        `/api/content/${tessera.ContentID}/tags/${newTag.TagID}`,
+        { method: "POST" }
+      );
+
+      setSelectedTags([...selectedTags, newTag]);
+      setTagSearch("");
+      setPropertyWarning("");
+      await refreshWorkspaceData();
+    } catch (err) {
+      console.error("Failed to create tag:", err);
+      setPropertyWarning("Failed to create tag. Please try again.");
+    }
+  };
+
+  const removeTag = async (tagId: number) => {
+    if (selectedTags.length <= 1) {
+      setPropertyWarning("A tessera must have at least one tag.");
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/content/${tessera.ContentID}/tags/${tagId}`, {
+        method: "DELETE",
+      });
+
+      setSelectedTags(selectedTags.filter((tag) => tag.TagID !== tagId));
+      setPropertyWarning("");
+      await refreshWorkspaceData();
+    } catch (err) {
+      console.error("Failed to remove tag:", err);
+      setPropertyWarning("Failed to remove tag. Please try again.");
+    }
+  };
+
+  const addCollection = async (newCollection: Collection) => {
+    try {
+      await apiRequest(
+        `/api/collections/${newCollection.CollectionID}/content/${tessera.ContentID}`,
+        { method: "POST" }
+      );
+
+      setSelectedCollections([...selectedCollections, newCollection]);
+      setCollectionSearch("");
+      setPropertyWarning("");
+      await refreshWorkspaceData();
+    } catch (err) {
+      console.error("Failed to add collection:", err);
+      setPropertyWarning("Failed to add collection. Please try again.");
+    }
+  };
+
+  const removeCollection = async (collectionId: number) => {
+    try {
+      await apiRequest(
+        `/api/collections/${collectionId}/content/${tessera.ContentID}`,
+        { method: "DELETE" }
+      );
+
+      setSelectedCollections(
+        selectedCollections.filter((item) => item.CollectionID !== collectionId)
+      );
+
+      if (collection?.CollectionID === collectionId) {
+        onRemoveFromCollection();
+      }
+
+      setPropertyWarning("");
+      await refreshWorkspaceData();
+    } catch (err) {
+      console.error("Failed to remove collection:", err);
+      setPropertyWarning("Failed to remove collection. Please try again.");
     }
   };
 
@@ -145,11 +253,10 @@ function TesseraDetail({
 
     if (tessera.ContentType === "PDF") {
       return (
-        <iframe
-          className="tessera-file-preview"
-          src={tessera.FilePath}
-          title={tessera.Title}
-        />
+        <div className="tessera-text-preview">
+          PDF preview would appear here once the file exists at{" "}
+          {tessera.FilePath}.
+        </div>
       );
     }
 
@@ -157,7 +264,7 @@ function TesseraDetail({
       return (
         <img
           className="tessera-image-preview"
-          src={tessera.FilePath}
+          src={tessera.FilePath || ""}
           alt={tessera.Title}
         />
       );
@@ -166,7 +273,7 @@ function TesseraDetail({
     if (tessera.ContentType === "Audio") {
       return (
         <audio controls className="tessera-media-preview">
-          <source src={tessera.FilePath} />
+          <source src={tessera.FilePath || ""} />
         </audio>
       );
     }
@@ -174,7 +281,7 @@ function TesseraDetail({
     if (tessera.ContentType === "Video") {
       return (
         <video controls className="tessera-video-preview">
-          <source src={tessera.FilePath} />
+          <source src={tessera.FilePath || ""} />
         </video>
       );
     }
@@ -187,7 +294,7 @@ function TesseraDetail({
       <div className="tessera-detail-modal">
         <div className="tessera-modal-controls">
           <button onClick={onClose} title="Close">
-            ×
+            x
           </button>
         </div>
 
@@ -222,7 +329,7 @@ function TesseraDetail({
                           removeTag(tag.TagID);
                         }}
                       >
-                        ×
+                        x
                       </button>
                     )}
                   </span>
@@ -285,7 +392,7 @@ function TesseraDetail({
                           removeCollection(item.CollectionID);
                         }}
                       >
-                        ×
+                        x
                       </button>
                     )}
                   </span>
@@ -324,6 +431,13 @@ function TesseraDetail({
                 </div>
               )}
             </div>
+
+            {propertyWarning && (
+              <>
+                <div />
+                <p className="form-warning">{propertyWarning}</p>
+              </>
+            )}
 
             <div className="tessera-property-label">Created</div>
             <div className="read-only-property">{tessera.CreatedAt}</div>
