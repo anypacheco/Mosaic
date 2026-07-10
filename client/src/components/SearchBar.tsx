@@ -1,19 +1,40 @@
 import { useEffect, useRef, useState } from "react";
+import type React from "react";
+import { FaRegStar } from "react-icons/fa";
 import { useWorkspace } from "../context/WorkspaceContext";
 
-import { createTag as apiCreateTag, type Tag } from "../api/client";
 
-function SearchBar() {
-  const { tags, content, collections, currentWorkspace }=useWorkspace();
+import 
+{
+  createSavedSearch as apiCreateSavedSearch,
+  deleteSavedSearch as apiDeleteSavedSearch,
+  addTagToSavedSearch as apiAddTagToSavedSearch,
+  getSavedSearchTags,
+  type Tag,
+  type ContentType,
+} from "../api/client";
 
-  const [open, setOpen] = useState(false);
-  const [searchText, setSearchText] = useState("");
-  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+import SaveSearchModal from "./SaveSearch";
+
+function SearchBar() 
+{
+  const {
+    tags,
+    content,
+    collections,
+    savedSearches,
+    currentWorkspace,
+    refreshWorkspaceData,
+  } =useWorkspace();
+
+  const [open, setOpen]=useState(false);
+  const [searchText, setSearchText]= useState("");
+  const [selectedTags, setSelectedTags] =useState<Tag[]>([]);
+  const [showSaveModal, setShowSaveModal] =useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) 
-	{
+    function handleClickOutside(event: MouseEvent) {
       if (
         wrapperRef.current &&
         !wrapperRef.current.contains(event.target as Node)
@@ -31,14 +52,19 @@ function SearchBar() {
 
   const availableTags = tags.filter(
     (tag) =>
-      !selectedTags.some((selected) => selected.TagID === tag.TagID) &&
-      tag.TagName.toLowerCase().includes(searchText.toLowerCase())
+      !selectedTags.some((selected) => selected.TagID === tag.TagID) && tag.TagName.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const matchingContent = content.filter((item) =>item.Title.toLowerCase().includes(searchText.toLowerCase())
+  const matchingContent = content.filter((item) =>
+    item.Title.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const matchingCollections = collections.filter((collection) => collection.CollectionName.toLowerCase().includes(searchText.toLowerCase())
+  const matchingCollections = collections.filter((collection) =>
+    collection.CollectionName.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  const matchingSavedSearches = savedSearches.filter((search) =>
+    search.SearchName.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const addTag = (tag: Tag) => {
@@ -48,23 +74,81 @@ function SearchBar() {
   };
 
   const removeTag = (tagId: number) => {
-    setSelectedTags(selectedTags.filter((tag) => tag.TagID!== tagId));
+    setSelectedTags(selectedTags.filter((tag) => tag.TagID !== tagId));
   };
 
-  const createTag = async () => {
-    if (searchText.trim() === "" || !currentWorkspace) return;
+  const saveSearch = async (name: string, contentType: ContentType) => {
+    if (!currentWorkspace) return;
 
     try {
-      const newTag = await apiCreateTag({
+      const newSavedSearch = await apiCreateSavedSearch({
         WorkspaceID: currentWorkspace.WorkspaceID,
-        TagName: searchText.trim(),
-        HexColor: "#9B5DE5",
+        SearchName: name,
+        ContentType: contentType,
       });
-      setSelectedTags([...selectedTags, newTag]);
-      setSearchText("");
+
+      await Promise.all(
+        selectedTags.map((tag) =>
+          apiAddTagToSavedSearch(newSavedSearch.SavedSearchID, tag.TagID)
+        )
+      );
+
+      await refreshWorkspaceData();
+      setShowSaveModal(false);
       setOpen(true);
+
+    } catch (err) 
+	{
+      console.error("Failed to save search:", err);
+    }
+  };
+
+  const loadSavedSearch = async (savedSearchId: number) => {
+    const savedSearch = savedSearches.find(
+      (search) => search.SavedSearchID === savedSearchId
+    );
+
+    if (!savedSearch) return;
+
+    try {
+      const linkedTags = await getSavedSearchTags(savedSearchId);
+      setSelectedTags(linkedTags);
+      setSearchText(savedSearch.SearchName);
+      setOpen(false);
+
+    } catch (err) 
+	
+	{
+      console.error("Failed to load saved search:", err);
+    }
+  };
+
+  const deleteSavedSearch = async (
+    e: React.MouseEvent<HTMLButtonElement>,
+    savedSearchId: number
+  ) => {
+    e.stopPropagation();
+
+    try {
+      await apiDeleteSavedSearch(savedSearchId);
+      await refreshWorkspaceData();
     } catch (err) {
-      console.error("Failed to create tag:", err);
+      console.error("Failed to delete saved search:", err);
+    }
+  };
+
+  const handleSearchSubmit =() => {
+    setOpen(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSearchSubmit();
+    }
+
+    if (e.key === "Escape") {
+      setOpen(false);
     }
   };
 
@@ -77,7 +161,7 @@ function SearchBar() {
           {selectedTags.map((tag) => (
             <span className="search-chip" key={tag.TagID}>
               {tag.TagName}
-              <button onClick={() => removeTag(tag.TagID)}>×</button>
+              <button onClick={() => removeTag(tag.TagID)}>x</button>
             </span>
           ))}
 
@@ -88,16 +172,24 @@ function SearchBar() {
               setSearchText(e.target.value);
               setOpen(true);
             }}
+            onKeyDown={handleKeyDown}
             placeholder={
               selectedTags.length === 0
-                ? "Search files, tags, or content..."
+                ? "Search files, tags, collections, or content..."
                 : "Search..."
             }
           />
         </div>
 
-        <button className="save-search-icon" title="Save Search">
-          ☆
+        <button
+          className="save-search-icon"
+          title="Save Search"
+          onClick={() => {
+            setOpen(false);
+            setShowSaveModal(true);
+          }}
+        >
+          <FaRegStar />
         </button>
       </div>
 
@@ -105,10 +197,29 @@ function SearchBar() {
         <div className="filter-dropdown search-picker">
           <p>Select a tag, collection, or tessera</p>
 
-          <h4>Saved Searches</h4>
-          <div className="saved-search-placeholder">
-            Saved searches will be here
-          </div>
+          {matchingSavedSearches.length > 0 && (
+            <>
+              <h4>Saved Searches</h4>
+
+              {matchingSavedSearches.map((search) => (
+                <button
+                  className="picker-row saved-search-row"
+                  key={search.SavedSearchID}
+                  onClick={() => loadSavedSearch(search.SavedSearchID)}
+                >
+                  <span>{search.SearchName}</span>
+
+                  <button
+                    className="delete-saved-search"
+                    title="Delete Saved Search"
+                    onClick={(e) => deleteSavedSearch(e, search.SavedSearchID)}
+                  >
+                    x
+                  </button>
+                </button>
+              ))}
+            </>
+          )}
 
           {availableTags.length > 0 && (
             <>
@@ -153,17 +264,15 @@ function SearchBar() {
               ))}
             </>
           )}
-
-          {searchText.trim() !== "" && (
-            <>
-              <div className="dropdown-divider" />
-
-              <button className="picker-row create-row" onClick={createTag}>
-                Create tag "{searchText}"
-              </button>
-            </>
-          )}
         </div>
+      )}
+
+      {showSaveModal && (
+        <SaveSearchModal
+          selectedTags={selectedTags}
+          onCancel={() => setShowSaveModal(false)}
+          onSave={saveSearch}
+        />
       )}
     </div>
   );
