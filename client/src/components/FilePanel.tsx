@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useWorkspace } from "../context/WorkspaceContext";
 import {
+  addTagToContent as apiAddTagToContent,
   createContent as apiCreateContent,
   createTag as apiCreateTag,
-  addTagToContent as apiAddTagToContent,
   type Content,
   type ContentType,
   type Tag,
@@ -11,8 +11,9 @@ import {
 
 import TesseraDetail from "./TesseraDetail";
 
-const MAX_FILE_SIZE_MB=500;
-const acceptedFileTypes= ".md,.pdf,.png,.jpg,.jpeg,.mp3,.mp4";
+const MAX_FILE_SIZE_MB = 500;
+const acceptedFileTypes = ".md,.pdf,.png,.jpg,.jpeg,.mp3,.mp4";
+const API_BASE = "http://localhost:3000";
 
 function getContentType(fileName: string): ContentType | null {
   const extension = fileName.split(".").pop()?.toLowerCase();
@@ -26,16 +27,13 @@ function getContentType(fileName: string): ContentType | null {
   return null;
 }
 
-function FilePanel() 
-{
+function FilePanel() {
   const { content, tags, currentWorkspace, loading, refreshWorkspaceData } =
     useWorkspace();
 
   const tagsPickerRef = useRef<HTMLDivElement>(null);
 
-  const [selectedTessera, setSelectedTessera] = useState<Content | null>(
-    null
-  );
+  const [selectedTessera, setSelectedTessera] = useState<Content | null>(null);
 
   const [showAddFileModal, setShowAddFileModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -75,6 +73,7 @@ function FilePanel()
     setTagSearch("");
     setSelectedTags([]);
     setFormWarning("");
+    setSubmitting(false);
   };
 
   const availableTags = tags.filter(
@@ -93,8 +92,7 @@ function FilePanel()
     setFormWarning("");
   };
 
-  const createTag = async () => 
-	{
+  const createTag = async () => {
     if (tagSearch.trim() === "" || !currentWorkspace) return;
 
     const existingTag = tags.find(
@@ -137,6 +135,25 @@ function FilePanel()
     return "";
   };
 
+  const uploadFile = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const uploadResponse = await fetch(`${API_BASE}/api/upload`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error("Upload failed");
+    }
+
+    return uploadResponse.json() as Promise<{
+      filePath: string;
+      originalName: string;
+    }>;
+  };
+
   const addFile = async () => {
     const missingFieldsMessage = getMissingFieldsMessage();
 
@@ -176,17 +193,17 @@ function FilePanel()
     setSubmitting(true);
 
     try {
+      const uploadedFile = await uploadFile(selectedFile);
+
       const newContent = await apiCreateContent({
         WorkspaceID: currentWorkspace.WorkspaceID,
         Title: fileTitle.trim(),
         ContentType: contentType,
         TextContent: textContent,
-        FilePath:
-          contentType === "Markdown" ? null : `/files/${selectedFile.name}`,
+        FilePath: uploadedFile.filePath,
         Description: fileDescription.trim(),
       });
 
-      // Link every selected tag to the newly created content
       await Promise.all(
         selectedTags.map((tag) =>
           apiAddTagToContent(newContent.ContentID, tag.TagID)

@@ -1,12 +1,33 @@
 const express=require('express');
 const cors=require('cors');
 const db=require('../database/db');
+const multer = require('multer');
+const path = require('path');
 
 const app=express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
+
+// File upload setup
+const storage = multer.diskStorage({
+    destination: 'uploads/',
+    filename: (req, file, cb) => {
+        const safeName = `${Date.now()}-${file.originalname}`;
+        cb(null, safeName);
+    },
+});
+
+const upload = multer({ storage });
+
+app.post('/api/upload', upload.single('file'), (req, res) => {
+    res.json({
+        filePath: `/uploads/${req.file.filename}`,
+        originalName: req.file.originalname,
+    });
+});
 
 //health check 
 

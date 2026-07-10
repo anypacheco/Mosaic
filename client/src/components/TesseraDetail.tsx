@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useWorkspace } from "../context/WorkspaceContext";
-import { createTag as apiCreateTag, type Collection, type Content, type Tag } from "../api/client";
+import {
+  createTag as apiCreateTag,
+  type Collection,
+  type Content,
+  type Tag,
+} from "../api/client";
 
 const API_BASE = "http://localhost:3000";
 
@@ -48,6 +53,12 @@ function TesseraDetail({
   const [selectedCollections, setSelectedCollections] = useState<Collection[]>(
     collection ? [collection] : []
   );
+
+  const fileUrl = tessera.FilePath
+    ? tessera.FilePath.startsWith("http")
+      ? tessera.FilePath
+      : `${API_BASE}${tessera.FilePath}`
+    : "";
 
   useEffect(() => {
     async function loadTesseraRelationships() {
@@ -252,36 +263,59 @@ function TesseraDetail({
     }
 
     if (tessera.ContentType === "PDF") {
+      if (!fileUrl) {
+        return <div className="tessera-text-preview">No PDF file available.</div>;
+      }
+
       return (
-        <div className="tessera-text-preview">
-          PDF preview would appear here once the file exists at{" "}
-          {tessera.FilePath}.
-        </div>
+        <iframe
+          className="tessera-file-preview"
+          src={fileUrl}
+          title={tessera.Title}
+        />
       );
     }
 
     if (tessera.ContentType === "Image") {
+      if (!fileUrl) {
+        return (
+          <div className="tessera-text-preview">No image file available.</div>
+        );
+      }
+
       return (
         <img
           className="tessera-image-preview"
-          src={tessera.FilePath || ""}
+          src={fileUrl}
           alt={tessera.Title}
         />
       );
     }
 
     if (tessera.ContentType === "Audio") {
+      if (!fileUrl) {
+        return (
+          <div className="tessera-text-preview">No audio file available.</div>
+        );
+      }
+
       return (
         <audio controls className="tessera-media-preview">
-          <source src={tessera.FilePath || ""} />
+          <source src={fileUrl} />
         </audio>
       );
     }
 
     if (tessera.ContentType === "Video") {
+      if (!fileUrl) {
+        return (
+          <div className="tessera-text-preview">No video file available.</div>
+        );
+      }
+
       return (
         <video controls className="tessera-video-preview">
-          <source src={tessera.FilePath || ""} />
+          <source src={fileUrl} />
         </video>
       );
     }
