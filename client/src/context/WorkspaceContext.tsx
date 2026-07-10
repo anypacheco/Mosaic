@@ -6,9 +6,7 @@ import {
   useEffect,
   useState,
   type ReactNode,
-} 
-
-from "react";
+} from "react";
 
 
 import {
@@ -17,53 +15,53 @@ import {
   getWorkspaceTags,
   getWorkspaceCollections,
   getWorkspaceSnapshots,
+  getWorkspaceSavedSearches,
   type Workspace,
   type Content,
   type Tag,
   type Collection,
   type Snapshot,
-} 
+  type SavedSearch,
+} from "../api/client";
 
-from "../api/client";
-
-// this is what the rest of the app can read from the context
-interface WorkspaceContextValue 
-{
+//what the rest of the app can read from the context
+interface WorkspaceContextValue {
   workspaces: Workspace[];
   currentWorkspace: Workspace | null;
-  setCurrentWorkspace: (workspace: Workspace) =>void;
-
+  setCurrentWorkspace: (workspace: Workspace | null) => void;
+  refreshWorkspaces: () => Promise<Workspace[]>;
   content: Content[];
   tags: Tag[];
   collections: Collection[];
+  savedSearches: SavedSearch[];
   snapshots: Snapshot[];
-
   loading: boolean;
   error: string | null;
+  refreshWorkspaceData: () => Promise<void>;
 }
 
-const WorkspaceContext = createContext<WorkspaceContextValue |undefined>(
+const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(
   undefined
 );
 
-export function WorkspaceProvider({children }: {children: ReactNode }) 
-{
-  const [workspaces, setWorkspaces]= useState<Workspace[]>([]);
-  const [currentWorkspace, setCurrentWorkspace]= useState<Workspace | null>(
+export function WorkspaceProvider({ children }: { children: ReactNode }) {
+  const [workspaces, setWorkspaces]=useState<Workspace[]>([]);
+  const [currentWorkspace, setCurrentWorkspace]=useState<Workspace | null>(
     null
   );
-
-
   const [content, setContent] =useState<Content[]>([]);
   const [tags, setTags] =useState<Tag[]>([]);
-
   const [collections, setCollections] =useState<Collection[]>([]);
-  const [snapshots, setSnapshots]= useState<Snapshot[]>([]);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError]= useState<string | null>(null);
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [snapshots, setSnapshots] =useState<Snapshot[]>([]);
 
-  // Load the list of workspaces once, on first render
+  const [loading, setLoading] =useState(true);
+
+  const [error, setError] =useState<string | null>(null);
+
+  //load list of workspaces once on first render
+  
   useEffect(() => {
     getWorkspaces()
       .then((data) => 
@@ -73,9 +71,7 @@ export function WorkspaceProvider({children }: {children: ReactNode })
           setCurrentWorkspace(data[0]);
         }
       })
-
-      .catch((err) => 
-		{
+      .catch((err) => {
         console.error(err);
         setError(
           "Could not reach the server. Make sure the backend is running on port 3000."
@@ -84,8 +80,23 @@ export function WorkspaceProvider({children }: {children: ReactNode })
       });
   }, []);
 
-  //whenever the selected workspace changes, load all of its data
-  useEffect(() => {
+  // refetches workspace list (used after creating/ deleting a workspace)
+  async function refreshWorkspaces(): Promise<Workspace[]> {
+    try {
+      const data = await getWorkspaces();
+      setWorkspaces(data);
+      return data;
+    } catch (err) {
+      console.error(err);
+      setError(
+        "Could not reach the server. Make sure the backend is running on port 3000."
+      );
+      return [];
+    }
+  }
+
+  // refetches everything for the current workspace (content, tags, collections, saved searches, snapshots)
+  async function refreshWorkspaceData(): Promise<void> {
     if (!currentWorkspace) return;
 
     setLoading(true);
@@ -93,38 +104,49 @@ export function WorkspaceProvider({children }: {children: ReactNode })
 
     const id=currentWorkspace.WorkspaceID;
 
-    Promise.all([
-      getWorkspaceContent(id),
-      getWorkspaceTags(id),
-      getWorkspaceCollections(id),
-      getWorkspaceSnapshots(id),
-    ])
-      .then(([contentData, tagData, collectionData, snapshotData]) => 
-		{
-        setContent(contentData);
-        setTags(tagData);
-        setCollections(collectionData);
-        setSnapshots(snapshotData);
-      })
-      .catch((err) => {
-        console.error(err);
+    try {
+      const [contentData, tagData, collectionData, savedSearchData, snapshotData] =
+        await Promise.all([
+          getWorkspaceContent(id),
+          getWorkspaceTags(id),
+          getWorkspaceCollections(id),
+          getWorkspaceSavedSearches(id),
+          getWorkspaceSnapshots(id),
+        ]);
 
-        setError("Failed to load workspace data.");
-      })
-	  
-      .finally(() => setLoading(false));
+      setContent(contentData);
+      setTags(tagData);
+      setCollections(collectionData);
+      setSavedSearches(savedSearchData);
+      setSnapshots(snapshotData);
+    } 
+	catch (err) {
+      console.error(err);
+      setError("Failed to load workspace data.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  //whenever selected workspace changes, load all of its data
+  useEffect(() => {
+    refreshWorkspaceData();
+
   }, [currentWorkspace]);
 
   const value: WorkspaceContextValue = {
     workspaces,
     currentWorkspace,
     setCurrentWorkspace,
+    refreshWorkspaces,
     content,
     tags,
     collections,
+    savedSearches,
     snapshots,
     loading,
     error,
+    refreshWorkspaceData,
   };
 
   return (
@@ -135,12 +157,10 @@ export function WorkspaceProvider({children }: {children: ReactNode })
 }
 
 //little helper hook so that the components can just call useWorkspace()
-export function useWorkspace(): WorkspaceContextValue 
-{
+export function useWorkspace(): WorkspaceContextValue {
   const context = useContext(WorkspaceContext);
   if (context === undefined) {
     throw new Error("useWorkspace must be used inside a WorkspaceProvider");
   }
   return context;
-
 }

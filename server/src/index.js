@@ -62,6 +62,21 @@ app.post('/api/workspaces', async (req, res) => {
     }
 });
 
+// delete a workspace (cascades to its content, tags, collections, etc.)
+app.delete('/api/workspaces/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await db.query('DELETE FROM Workspace WHERE WorkspaceID = ?', [id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Workspace not found' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting workspace:', error);
+        res.status(500).json({ error: 'Failed to delete workspace' });
+    }
+});
+
 //content routes
 // GET all content in a workspace
 
@@ -247,7 +262,6 @@ app.get('/api/collections/:id/content', async (req, res) => {
 
 // saved search routes
 // GET all saved searches in a workspace
-
 app.get('/api/workspaces/:workspaceId/saved-searches', async (req, res) => {
     try {
         const { workspaceId } = req.params;
@@ -255,12 +269,80 @@ app.get('/api/workspaces/:workspaceId/saved-searches', async (req, res) => {
             'SELECT * FROM Saved_Search WHERE WorkspaceID = ? ORDER BY CreatedAt DESC',
             [workspaceId]
         );
-
         res.json(searches);
-    } catch (error) 
-	{
+    } catch (error) {
         console.error('Error fetching saved searches:', error);
         res.status(500).json({ error: 'Failed to fetch saved searches' });
+    }
+});
+
+// GET tags associated with a saved search
+app.get('/api/saved-searches/:id/tags', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const tags = await db.query(
+            `SELECT t.* FROM Tag t
+             JOIN SavedSearch_Tag sst ON t.TagID = sst.TagID
+             WHERE sst.SavedSearchID = ?`,
+            [id]
+        );
+        res.json(tags);
+    } catch (error) {
+        console.error('Error fetching saved search tags:', error);
+        res.status(500).json({ error: 'Failed to fetch saved search tags' });
+    }
+});
+
+// POST create new saved search
+app.post('/api/saved-searches', async (req, res) => {
+    try {
+        const { WorkspaceID, SearchName, ContentType } = req.body;
+        if (!WorkspaceID || !SearchName) {
+            return res.status(400).json({ error: 'WorkspaceID and SearchName are required' });
+        }
+        const result = await db.query(
+            'INSERT INTO Saved_Search (WorkspaceID, SearchName, ContentType) VALUES (?, ?, ?)',
+            [WorkspaceID, SearchName, ContentType || null]
+        );
+        res.status(201).json({
+            SavedSearchID: result.insertId,
+            WorkspaceID,
+            SearchName,
+            ContentType: ContentType || null,
+        });
+    } catch (error) {
+        console.error('Error creating saved search:', error);
+        res.status(500).json({ error: 'Failed to create saved search' });
+    }
+});
+
+// DELETE a saved search
+app.delete('/api/saved-searches/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await db.query('DELETE FROM Saved_Search WHERE SavedSearchID = ?', [id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Saved search not found' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting saved search:', error);
+        res.status(500).json({ error: 'Failed to delete saved search' });
+    }
+});
+
+// POST associate a tag with a saved search
+app.post('/api/saved-searches/:savedSearchId/tags/:tagId', async (req, res) => {
+    try {
+        const { savedSearchId, tagId } = req.params;
+        await db.query(
+            'INSERT INTO SavedSearch_Tag (SavedSearchID, TagID) VALUES (?, ?)',
+            [savedSearchId, tagId]
+        );
+        res.status(201).json({ SavedSearchID: savedSearchId, TagID: tagId });
+    } catch (error) {
+        console.error('Error associating tag with saved search:', error);
+        res.status(500).json({ error: 'Failed to associate tag with saved search' });
     }
 });
 
@@ -322,6 +404,6 @@ startServer();
 process.on('SIGTERM', async () => {
     console.log('SIGTERM received, shutting down gracefully...');
     await db.closePool();
-	
+
     process.exit(0);
 });

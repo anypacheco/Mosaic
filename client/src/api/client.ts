@@ -93,6 +93,14 @@ async function postJSON<T>(url: string, body: unknown): Promise<T>
   return res.json() as Promise<T>;
 }
 
+async function deleteJSON<T>(url: string): Promise<T> {
+  const res = await fetch(url, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status}): ${url}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 //workspaces
 
 export function getWorkspaces(): Promise<Workspace[]> {
@@ -102,8 +110,18 @@ export function getWorkspaces(): Promise<Workspace[]> {
 export function createWorkspace(data: {
   WorkspaceName: string;
   Description?: string;
-}): Promise<Workspace> {
+}): Promise<Workspace> 
+{
   return postJSON<Workspace>(`${API_BASE}/workspaces`,data);
+}
+
+export function deleteWorkspace(
+  workspaceId: number
+): Promise<{ success: boolean }> 
+{
+  return deleteJSON<{ success: boolean }>(
+    `${API_BASE}/workspaces/${workspaceId}`
+  );
 }
 
 //content
@@ -135,6 +153,31 @@ export function createTag(data: {
   return postJSON<Tag>(`${API_BASE}/tags`, data);
 }
 
+// ---- Content creation & tagging ----
+
+export function createContent(data: {
+  WorkspaceID: number;
+  Title: string;
+  ContentType: ContentType;
+  TextContent?: string | null;
+  FilePath?: string | null;
+  Description?: string | null;
+}): Promise<{
+  ContentID: number;
+  WorkspaceID: number;
+  Title: string;
+  ContentType: ContentType;
+}> {
+  return postJSON(`${API_BASE}/content`, data);
+}
+
+export function addTagToContent(
+  contentId: number,
+  tagId: number
+): Promise<{ ContentID: number; TagID: number }> {
+  return postJSON(`${API_BASE}/content/${contentId}/tags/${tagId}`, {});
+}
+
 //collections
 //
 
@@ -164,6 +207,34 @@ export function getWorkspaceSavedSearches(
     `${API_BASE}/workspaces/${workspaceId}/saved-searches`
   );
 }
+
+export function getSavedSearchTags(savedSearchId: number): Promise<Tag[]> {
+  return getJSON<Tag[]>(`${API_BASE}/saved-searches/${savedSearchId}/tags`);
+}
+
+export function createSavedSearch(data: {
+  WorkspaceID: number;
+  SearchName: string;
+  ContentType?: ContentType | null;
+}): Promise<SavedSearch> {
+  return postJSON<SavedSearch>(`${API_BASE}/saved-searches`, data);
+}
+
+export function deleteSavedSearch(
+  savedSearchId: number
+): Promise<{ success: boolean }> {
+  return deleteJSON<{ success: boolean }>(
+    `${API_BASE}/saved-searches/${savedSearchId}`
+  );
+}
+
+export function addTagToSavedSearch(
+  savedSearchId: number,
+  tagId: number
+): Promise<{ SavedSearchID: number; TagID: number }> {
+  return postJSON(`${API_BASE}/saved-searches/${savedSearchId}/tags/${tagId}`, {});
+}
+
 
 // snapshots
 export function getWorkspaceSnapshots(workspaceId: number): Promise<Snapshot[]> {
