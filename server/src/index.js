@@ -188,6 +188,27 @@ app.post('/api/content', async (req, res) => {
     }
 });
 
+// DELETE content by ID
+app.delete('/api/content/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await db.query(
+            'DELETE FROM Content WHERE ContentID = ?',
+            [id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Content not found' });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting content:', error);
+        res.status(500).json({ error: 'Failed to delete content' });
+    }
+});
+
 // tag routes
 // GET all tags in a workspace
 

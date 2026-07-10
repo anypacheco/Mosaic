@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { FaTrash } from "react-icons/fa";
 import { useWorkspace } from "../context/WorkspaceContext";
 import {
   createTag as apiCreateTag,
@@ -128,6 +129,26 @@ function TesseraDetail({
   const tagAlreadyExists = tags.some(
     (tag) => tag.TagName.toLowerCase() === tagSearch.trim().toLowerCase()
   );
+
+  const deleteTessera = async () => {
+    const confirmed = confirm(
+      `Are you sure you want to delete "${tessera.Title}"?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await apiRequest(`/api/content/${tessera.ContentID}`, {
+        method: "DELETE",
+      });
+
+      await refreshWorkspaceData();
+      onClose();
+    } catch (err) {
+      console.error("Failed to delete tessera:", err);
+      setPropertyWarning("Failed to delete tessera. Please try again.");
+    }
+  };
 
   const addTag = async (tag: Tag) => {
     try {
@@ -327,7 +348,19 @@ function TesseraDetail({
     <div className="modal-backdrop">
       <div className="tessera-detail-modal">
         <div className="tessera-modal-controls">
-          <button onClick={onClose} title="Close">
+          <button
+            className="delete-tessera-button"
+            onClick={deleteTessera}
+            title="Delete tessera"
+            aria-label="Delete tessera"
+          >
+            <FaTrash />
+          </button>
+          <button
+            className="close-tessera-button"
+            onClick={onClose}
+            title="Close"
+          >
             x
           </button>
         </div>
