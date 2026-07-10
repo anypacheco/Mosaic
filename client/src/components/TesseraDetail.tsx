@@ -130,6 +130,42 @@ function TesseraDetail({
     (tag) => tag.TagName.toLowerCase() === tagSearch.trim().toLowerCase()
   );
 
+  const saveTesseraChanges = async () => {
+    if (tessera.ContentType === "Markdown" && markdownContent.trim() === "") {
+      setContentWarning("Markdown content cannot be blank.");
+      return false;
+    }
+
+    try {
+      await apiRequest(`/api/content/${tessera.ContentID}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          Description: description,
+          TextContent:
+            tessera.ContentType === "Markdown" ? markdownContent : undefined,
+        }),
+      });
+
+      await refreshWorkspaceData();
+      return true;
+    } catch (err) {
+      console.error("Failed to save tessera changes:", err);
+      setPropertyWarning("Failed to save changes. Please try again.");
+      return false;
+    }
+  };
+
+  const handleClose = async () => {
+    const saved = await saveTesseraChanges();
+
+    if (saved) {
+      onClose();
+    }
+  };
+
   const deleteTessera = async () => {
     const confirmed = confirm(
       `Are you sure you want to delete "${tessera.Title}"?`
@@ -358,7 +394,7 @@ function TesseraDetail({
           </button>
           <button
             className="close-tessera-button"
-            onClick={onClose}
+            onClick={handleClose}
             title="Close"
           >
             x

@@ -188,6 +188,51 @@ app.post('/api/content', async (req, res) => {
     }
 });
 
+// PATCH update content by ID
+app.patch('/api/content/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { Description, TextContent } = req.body;
+
+        if (TextContent !== undefined && TextContent.trim() === '') {
+            return res.status(400).json({ error: 'Markdown content cannot be blank' });
+        }
+
+        const updates = [];
+        const values = [];
+
+        if (Description !== undefined) {
+            updates.push('Description = ?');
+            values.push(Description);
+        }
+
+        if (TextContent !== undefined) {
+            updates.push('TextContent = ?');
+            values.push(TextContent);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        values.push(id);
+
+        const result = await db.query(
+            `UPDATE Content SET ${updates.join(', ')} WHERE ContentID = ?`,
+            values
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Content not found' });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating content:', error);
+        res.status(500).json({ error: 'Failed to update content' });
+    }
+});
+
 // DELETE content by ID
 app.delete('/api/content/:id', async (req, res) => {
     try {
