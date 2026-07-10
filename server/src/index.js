@@ -421,6 +421,42 @@ app.post('/api/saved-searches/:savedSearchId/tags/:tagId', async (req, res) => {
     }
 });
 
+// graph view
+// GET comprehensive graph data mapping for a workspace
+app.get('/api/workspaces/:workspaceId/graph', async (req, res) => {
+    try {
+        const { workspaceId } = req.params;
+
+        // FIXED: Removed the array destructuring brackets [ ] around the variables
+        const contentRows = await db.query(
+            'SELECT ContentID, WorkspaceID, Title FROM Content WHERE WorkspaceID = ?',
+            [workspaceId]
+        );
+
+        const tagRows = await db.query(
+            'SELECT TagID, WorkspaceID, TagName, HexColor FROM Tag WHERE WorkspaceID = ?',
+            [workspaceId]
+        );
+
+        const edgeRows = await db.query(
+            `SELECT ct.ContentID, ct.TagID 
+             FROM Content_Tag ct
+             JOIN Content c ON ct.ContentID = c.ContentID
+             WHERE c.WorkspaceID = ?`,
+            [workspaceId]
+        );
+
+        res.json({
+            content: contentRows,
+            tags: tagRows,
+            contentTags: edgeRows
+        });
+    } catch (error) {
+        console.error('Error compiling graph query rows:', error);
+        res.status(500).json({ error: 'Failed to assemble relational graph data structure' });
+    }
+});
+
 // snapshot routes
 // GET all snapshots in a workspace
 
