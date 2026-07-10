@@ -1,24 +1,36 @@
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { FaRegStar } from "react-icons/fa";
-import {
-  tags,
-  content,
-  collections,
-  savedSearches as mockSavedSearches,
-  savedSearchTags,
+import { useWorkspace } from "../context/WorkspaceContext";
+
+
+import 
+{
+  createSavedSearch as apiCreateSavedSearch,
+  deleteSavedSearch as apiDeleteSavedSearch,
+  addTagToSavedSearch as apiAddTagToSavedSearch,
+  getSavedSearchTags,
+  type Tag,
   type ContentType,
-} from "../data/mockData";
+} from "../api/client";
+
 import SaveSearchModal from "./SaveSearch";
 
-function SearchBar() {
-  const [open, setOpen] = useState(false);
-  const [searchText, setSearchText] = useState("");
-  const [selectedTags, setSelectedTags] = useState<typeof tags>([]);
-  const [savedSearches, setSavedSearches] = useState(mockSavedSearches);
-  const [localSavedSearchTags, setLocalSavedSearchTags] =
-    useState(savedSearchTags);
-  const [showSaveModal, setShowSaveModal] = useState(false);
+function SearchBar() 
+{
+  const {
+    tags,
+    content,
+    collections,
+    savedSearches,
+    currentWorkspace,
+    refreshWorkspaceData,
+  } =useWorkspace();
+
+  const [open, setOpen]=useState(false);
+  const [searchText, setSearchText]= useState("");
+  const [selectedTags, setSelectedTags] =useState<Tag[]>([]);
+  const [showSaveModal, setShowSaveModal] =useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,8 +52,7 @@ function SearchBar() {
 
   const availableTags = tags.filter(
     (tag) =>
-      !selectedTags.some((selected) => selected.TagID === tag.TagID) &&
-      tag.TagName.toLowerCase().includes(searchText.toLowerCase())
+      !selectedTags.some((selected) => selected.TagID === tag.TagID) && tag.TagName.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const matchingContent = content.filter((item) =>
@@ -56,7 +67,7 @@ function SearchBar() {
     search.SearchName.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const addTag = (tag: (typeof tags)[number]) => {
+  const addTag = (tag: Tag) => {
     setSelectedTags([...selectedTags, tag]);
     setSearchText("");
     setOpen(true);
@@ -66,62 +77,67 @@ function SearchBar() {
     setSelectedTags(selectedTags.filter((tag) => tag.TagID !== tagId));
   };
 
-  const saveSearch = (name: string, contentType: ContentType) => {
-    const newSavedSearch = {
-      SavedSearchID: Date.now(),
-      WorkspaceID: 1,
-      SearchName: name,
-      ContentType: contentType,
-      CreatedAt: new Date().toISOString(),
-    };
+  const saveSearch = async (name: string, contentType: ContentType) => {
+    if (!currentWorkspace) return;
 
-    const newLinks = selectedTags.map((tag) => ({
-      SavedSearchID: newSavedSearch.SavedSearchID,
-      TagID: tag.TagID,
-    }));
+    try {
+      const newSavedSearch = await apiCreateSavedSearch({
+        WorkspaceID: currentWorkspace.WorkspaceID,
+        SearchName: name,
+        ContentType: contentType,
+      });
 
-    setSavedSearches([...savedSearches, newSavedSearch]);
-    setLocalSavedSearchTags([...localSavedSearchTags, ...newLinks]);
-    setShowSaveModal(false);
-    setOpen(true);
+      await Promise.all(
+        selectedTags.map((tag) =>
+          apiAddTagToSavedSearch(newSavedSearch.SavedSearchID, tag.TagID)
+        )
+      );
+
+      await refreshWorkspaceData();
+      setShowSaveModal(false);
+      setOpen(true);
+
+    } catch (err) 
+	{
+      console.error("Failed to save search:", err);
+    }
   };
 
-  const loadSavedSearch = (savedSearchId: number) => {
+  const loadSavedSearch = async (savedSearchId: number) => {
     const savedSearch = savedSearches.find(
       (search) => search.SavedSearchID === savedSearchId
     );
 
     if (!savedSearch) return;
 
-    const linkedTagIds = localSavedSearchTags
-      .filter((link) => link.SavedSearchID === savedSearchId)
-      .map((link) => link.TagID);
+    try {
+      const linkedTags = await getSavedSearchTags(savedSearchId);
+      setSelectedTags(linkedTags);
+      setSearchText(savedSearch.SearchName);
+      setOpen(false);
 
-    const linkedTags = tags.filter((tag) => linkedTagIds.includes(tag.TagID));
-
-    setSelectedTags(linkedTags);
-    setSearchText(savedSearch.SearchName);
-    setOpen(false);
+    } catch (err) 
+	
+	{
+      console.error("Failed to load saved search:", err);
+    }
   };
 
-  const deleteSavedSearch = (
+  const deleteSavedSearch = async (
     e: React.MouseEvent<HTMLButtonElement>,
     savedSearchId: number
   ) => {
     e.stopPropagation();
 
-    setSavedSearches(
-      savedSearches.filter((search) => search.SavedSearchID !== savedSearchId)
-    );
-
-    setLocalSavedSearchTags(
-      localSavedSearchTags.filter(
-        (link) => link.SavedSearchID !== savedSearchId
-      )
-    );
+    try {
+      await apiDeleteSavedSearch(savedSearchId);
+      await refreshWorkspaceData();
+    } catch (err) {
+      console.error("Failed to delete saved search:", err);
+    }
   };
 
-  const handleSearchSubmit = () => {
+  const handleSearchSubmit =() => {
     setOpen(false);
   };
 
@@ -139,7 +155,7 @@ function SearchBar() {
   return (
     <div className="search-wrapper" ref={wrapperRef}>
       <div className={open ? "search-main search-open" : "search-main"}>
-        <span className="search-icon">&#8981;</span>
+        <span className="search-icon">⌕</span>
 
         <div className="search-input-area">
           {selectedTags.map((tag) => (

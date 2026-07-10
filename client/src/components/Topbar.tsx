@@ -1,61 +1,81 @@
 import { useState } from "react";
 import { FaTrash } from "react-icons/fa";
-import { workspaces, snapshots } from "../data/mockData";
+import { useWorkspace } from "../context/WorkspaceContext";
 
-type TopbarProps = {
-  filesOpen: boolean;
+
+import 
+{
+  createWorkspace as apiCreateWorkspace,
+  deleteWorkspace as apiDeleteWorkspace,
+  type Workspace,
+} from "../api/client";
+
+type TopbarProps = 
+{
   onToggleFiles: () => void;
 };
 
-function Topbar({ filesOpen, onToggleFiles }: TopbarProps) {
-  const [timelineOpen, setTimelineOpen] = useState(false);
-  const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const [localWorkspaces, setLocalWorkspaces] = useState(workspaces);
-  const [currentWorkspace, setCurrentWorkspace] = useState(workspaces[0]);
-  const [workspaceToDelete, setWorkspaceToDelete] = useState<
-    (typeof workspaces)[number] | null
-  >(null);
+function Topbar({ onToggleFiles }: TopbarProps) {
+  const {
+    workspaces,
+    currentWorkspace,
+    setCurrentWorkspace,
+    snapshots,
+    refreshWorkspaces,
+  } =useWorkspace();
 
-  const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] =
-    useState(false);
+  const [timelineOpen, setTimelineOpen]=useState(false);
+  const [workspaceOpen, setWorkspaceOpen]=useState(false);
+
+  const [workspaceToDelete, setWorkspaceToDelete] =useState<Workspace | null>(null);
+
+  const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [modalError, setModalError] = useState("");
 
-  const latestSnapshot = snapshots
-    .filter((snapshot) => snapshot.WorkspaceID === currentWorkspace.WorkspaceID)
-    .at(-1);
+  // snapshots in context already belong to the current workspace
+  const latestSnapshot = snapshots.length > 0 ? snapshots[snapshots.length - 1] : undefined;
 
-  const createWorkspace = () => {
+  const createWorkspace = async () => {
     if (newWorkspaceName.trim() === "") return;
 
-    const newWorkspace = {
-      WorkspaceID: Date.now(),
-      WorkspaceName: newWorkspaceName.trim(),
-      Description: "",
-      CreatedAt: new Date().toISOString(),
-    };
+    setModalError("");
 
-    setLocalWorkspaces([...localWorkspaces, newWorkspace]);
-    setCurrentWorkspace(newWorkspace);
-    setNewWorkspaceName("");
-    setShowCreateWorkspaceModal(false);
-    setWorkspaceOpen(false);
+    try {
+      const newWorkspace = await apiCreateWorkspace({
+        WorkspaceName: newWorkspaceName.trim(),
+      });
+
+      await refreshWorkspaces();
+      setCurrentWorkspace(newWorkspace);
+      setNewWorkspaceName("");
+
+      setShowCreateWorkspaceModal(false);
+      setWorkspaceOpen(false);
+    } catch (err) {
+      console.error("Failed to create workspace:", err);
+      setModalError("Failed to create workspace. Please try again.");
+    }
   };
 
-  const deleteWorkspace = () => {
+  const deleteWorkspace = async () => {
     if (!workspaceToDelete) return;
 
-    const remainingWorkspaces = localWorkspaces.filter(
-      (workspace) => workspace.WorkspaceID !== workspaceToDelete.WorkspaceID
-    );
+    try {
+      await apiDeleteWorkspace(workspaceToDelete.WorkspaceID);
+      const updated = await refreshWorkspaces();
 
-    setLocalWorkspaces(remainingWorkspaces);
-
-    if (currentWorkspace.WorkspaceID === workspaceToDelete.WorkspaceID) {
-      setCurrentWorkspace(remainingWorkspaces[0] ?? workspaces[0]);
+      if (currentWorkspace?.WorkspaceID === workspaceToDelete.WorkspaceID) {
+        setCurrentWorkspace(updated.length > 0 ? updated[0] : null);
+      }
+    } catch (err) 
+	{
+      console.error("Failed to delete workspace:", err);
+    } finally 
+	{
+      setWorkspaceToDelete(null);
+      setWorkspaceOpen(false);
     }
-
-    setWorkspaceToDelete(null);
-    setWorkspaceOpen(false);
   };
 
   return (
@@ -68,13 +88,15 @@ function Topbar({ filesOpen, onToggleFiles }: TopbarProps) {
             className="workspace-select"
             onClick={() => setWorkspaceOpen(!workspaceOpen)}
           >
-            <span>{currentWorkspace.WorkspaceName}</span>
+            <span>
+              {currentWorkspace ? currentWorkspace.WorkspaceName : "..."}
+            </span>
             <span className="chevron">{workspaceOpen ? "▾" : "▸"}</span>
           </button>
 
           {workspaceOpen && (
             <div className="workspace-dropdown">
-              {localWorkspaces.map((workspace) => (
+              {workspaces.map((workspace) => (
                 <div className="workspace-row" key={workspace.WorkspaceID}>
                   <button
                     className="workspace-option"
@@ -165,11 +187,14 @@ function Topbar({ filesOpen, onToggleFiles }: TopbarProps) {
               autoFocus
             />
 
+            {modalError && <p className="form-warning">{modalError}</p>}
+
             <div className="modal-actions">
               <button
                 onClick={() => {
                   setShowCreateWorkspaceModal(false);
                   setNewWorkspaceName("");
+                  setModalError("");
                 }}
               >
                 Cancel
@@ -187,8 +212,8 @@ function Topbar({ filesOpen, onToggleFiles }: TopbarProps) {
             <h3>Delete workspace?</h3>
 
             <p>
-              Are you sure you want to delete 
-              "{workspaceToDelete.WorkspaceName}"? This will remove its
+              Are you sure you want to delete "
+              {workspaceToDelete.WorkspaceName}"? This will remove its
               tesserae, tags, collections, saved searches, and snapshots.
             </p>
 
@@ -207,5 +232,6 @@ function Topbar({ filesOpen, onToggleFiles }: TopbarProps) {
     </>
   );
 }
+
 
 export default Topbar;

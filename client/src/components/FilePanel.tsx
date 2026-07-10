@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from "react";
+import { useWorkspace } from "../context/WorkspaceContext";
 import {
-  content,
-  contentTags,
-  tags,
+  createContent as apiCreateContent,
+  createTag as apiCreateTag,
+  addTagToContent as apiAddTagToContent,
+  type Content,
   type ContentType,
-} from "../data/mockData";
+  type Tag,
+} from "../api/client";
+
 import TesseraDetail from "./TesseraDetail";
 
-const MAX_FILE_SIZE_MB = 500;
-const acceptedFileTypes = ".md,.pdf,.png,.jpg,.jpeg,.mp3,.mp4";
+const MAX_FILE_SIZE_MB=500;
+const acceptedFileTypes= ".md,.pdf,.png,.jpg,.jpeg,.mp3,.mp4";
 
 function getContentType(fileName: string): ContentType | null {
   const extension = fileName.split(".").pop()?.toLowerCase();
@@ -22,16 +26,16 @@ function getContentType(fileName: string): ContentType | null {
   return null;
 }
 
-function FilePanel() {
+function FilePanel() 
+{
+  const { content, tags, currentWorkspace, loading, refreshWorkspaceData } =
+    useWorkspace();
+
   const tagsPickerRef = useRef<HTMLDivElement>(null);
 
-  const [localContent, setLocalContent] = useState(content);
-  const [localTags, setLocalTags] = useState(tags);
-  const [localContentTags, setLocalContentTags] = useState(contentTags);
-
-  const [selectedTessera, setSelectedTessera] = useState<
-    (typeof content)[number] | null
-  >(null);
+  const [selectedTessera, setSelectedTessera] = useState<Content | null>(
+    null
+  );
 
   const [showAddFileModal, setShowAddFileModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -40,8 +44,10 @@ function FilePanel() {
 
   const [editingTags, setEditingTags] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
-  const [selectedTags, setSelectedTags] = useState<typeof tags>([]);
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+
   const [formWarning, setFormWarning] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -71,26 +77,27 @@ function FilePanel() {
     setFormWarning("");
   };
 
-  const availableTags = localTags.filter(
+  const availableTags = tags.filter(
     (tag) =>
       !selectedTags.some((selectedTag) => selectedTag.TagID === tag.TagID) &&
       tag.TagName.toLowerCase().includes(tagSearch.toLowerCase())
   );
 
-  const tagAlreadyExists = localTags.some(
+  const tagAlreadyExists = tags.some(
     (tag) => tag.TagName.toLowerCase() === tagSearch.trim().toLowerCase()
   );
 
-  const addTag = (tag: (typeof tags)[number]) => {
+  const addTag = (tag: Tag) => {
     setSelectedTags([...selectedTags, tag]);
     setTagSearch("");
     setFormWarning("");
   };
 
-  const createTag = () => {
-    if (tagSearch.trim() === "") return;
+  const createTag = async () => 
+	{
+    if (tagSearch.trim() === "" || !currentWorkspace) return;
 
-    const existingTag = localTags.find(
+    const existingTag = tags.find(
       (tag) => tag.TagName.toLowerCase() === tagSearch.trim().toLowerCase()
     );
 
@@ -99,17 +106,21 @@ function FilePanel() {
       return;
     }
 
-    const newTag = {
-      TagID: Date.now(),
-      WorkspaceID: 1,
-      TagName: tagSearch.trim(),
-      HexColor: "#9B5DE5",
-    };
+    try {
+      const newTag = await apiCreateTag({
+        WorkspaceID: currentWorkspace.WorkspaceID,
+        TagName: tagSearch.trim(),
+        HexColor: "#9B5DE5",
+      });
 
-    setLocalTags([...localTags, newTag]);
-    setSelectedTags([...selectedTags, newTag]);
-    setTagSearch("");
-    setFormWarning("");
+      await refreshWorkspaceData();
+      setSelectedTags([...selectedTags, newTag]);
+      setTagSearch("");
+      setFormWarning("");
+    } catch (err) {
+      console.error("Failed to create tag:", err);
+      setFormWarning("Failed to create tag. Please try again.");
+    }
   };
 
   const removeTag = (tagId: number) => {
@@ -134,11 +145,14 @@ function FilePanel() {
       return;
     }
 
-    if (!selectedFile) return;
+    if (!selectedFile || !currentWorkspace) return;
 
     const contentType = getContentType(selectedFile.name);
 
-    if (!contentType) return;
+    if (!contentType) {
+      setFormWarning("Unsupported file type.");
+      return;
+    }
 
     const fileSizeMB = selectedFile.size / (1024 * 1024);
 
@@ -159,28 +173,34 @@ function FilePanel() {
       }
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    setSubmitting(true);
 
-    const newTessera = {
-      ContentID: Date.now(),
-      WorkspaceID: 1,
-      Title: fileTitle.trim(),
-      FilePath: `/files/${selectedFile.name}`,
-      TextContent: textContent,
-      Description: fileDescription.trim(),
-      ContentType: contentType,
-      CreatedAt: today,
-      ModifiedAt: today,
-    };
+    try {
+      const newContent = await apiCreateContent({
+        WorkspaceID: currentWorkspace.WorkspaceID,
+        Title: fileTitle.trim(),
+        ContentType: contentType,
+        TextContent: textContent,
+        FilePath:
+          contentType === "Markdown" ? null : `/files/${selectedFile.name}`,
+        Description: fileDescription.trim(),
+      });
 
-    const newContentTagLinks = selectedTags.map((tag) => ({
-      ContentID: newTessera.ContentID,
-      TagID: tag.TagID,
-    }));
+      // Link every selected tag to the newly created content
+      await Promise.all(
+        selectedTags.map((tag) =>
+          apiAddTagToContent(newContent.ContentID, tag.TagID)
+        )
+      );
 
-    setLocalContent([...localContent, newTessera]);
-    setLocalContentTags([...localContentTags, ...newContentTagLinks]);
-    resetAddFileModal();
+      await refreshWorkspaceData();
+      resetAddFileModal();
+    } catch (err) {
+      console.error("Failed to add tessera:", err);
+      setFormWarning("Failed to save tessera. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -193,15 +213,28 @@ function FilePanel() {
         </div>
 
         <div className="file-tree">
-          {localContent.map((file) => (
-            <button
-              className="classic-file-row"
-              key={file.ContentID}
-              onClick={() => setSelectedTessera(file)}
-            >
-              <span className="classic-file-name">{file.Title}</span>
-            </button>
-          ))}
+          {loading && (
+            <div className="classic-file-row">
+              <span className="classic-file-name">Loading...</span>
+            </div>
+          )}
+
+          {!loading && content.length === 0 && (
+            <div className="classic-file-row">
+              <span className="classic-file-name">No tesserae yet</span>
+            </div>
+          )}
+
+          {!loading &&
+            content.map((file) => (
+              <button
+                className="classic-file-row"
+                key={file.ContentID}
+                onClick={() => setSelectedTessera(file)}
+              >
+                <span className="classic-file-name">{file.Title}</span>
+              </button>
+            ))}
         </div>
       </aside>
 
@@ -301,7 +334,9 @@ function FilePanel() {
 
             <div className="modal-actions">
               <button onClick={resetAddFileModal}>Cancel</button>
-              <button onClick={addFile}>Add</button>
+              <button onClick={addFile} disabled={submitting}>
+                {submitting ? "Adding..." : "Add"}
+              </button>
             </div>
           </div>
         </div>

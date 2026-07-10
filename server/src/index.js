@@ -1,31 +1,28 @@
-const express = require('express');
-const cors = require('cors');
-const db = require('../database/db');
+const express=require('express');
+const cors=require('cors');
+const db=require('../database/db');
 
-const app = express();
+const app=express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// ============================================
-// HEALTH CHECK
-// ============================================
+//health check 
+
 app.get('/', (req, res) => {
     res.json({ status: 'Mosaic server is running', timestamp: new Date().toISOString() });
 });
 
-// ============================================
-// WORKSPACE ROUTES
-// ============================================
-
+// workspace routes
 // GET all workspaces
 app.get('/api/workspaces', async (req, res) => {
     try {
         const workspaces = await db.query('SELECT * FROM Workspace ORDER BY CreatedAt DESC');
         res.json(workspaces);
+
     } catch (error) {
-        console.error('Error fetching workspaces:', error);
+        console.error('Error fetching workspaces:',error);
         res.status(500).json({ error: 'Failed to fetch workspaces' });
     }
 });
@@ -41,6 +38,7 @@ app.get('/api/workspaces/:id', async (req, res) => {
         res.json(workspace[0]);
     } catch (error) {
         console.error('Error fetching workspace:', error);
+		
         res.status(500).json({ error: 'Failed to fetch workspace' });
     }
 });
@@ -51,21 +49,37 @@ app.post('/api/workspaces', async (req, res) => {
         const { WorkspaceName, Description } = req.body;
         if (!WorkspaceName) {
             return res.status(400).json({ error: 'WorkspaceName is required' });
+
         }
         const result = await db.query('INSERT INTO Workspace (WorkspaceName, Description) VALUES (?, ?)', 
             [WorkspaceName, Description || null]);
         res.status(201).json({ WorkspaceID: result.insertId, WorkspaceName, Description });
-    } catch (error) {
+		
+    } catch (error) 
+	{
         console.error('Error creating workspace:', error);
         res.status(500).json({ error: 'Failed to create workspace' });
     }
 });
 
-// ============================================
-// CONTENT ROUTES
-// ============================================
+// delete a workspace (cascades to its content, tags, collections, etc.)
+app.delete('/api/workspaces/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await db.query('DELETE FROM Workspace WHERE WorkspaceID = ?', [id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Workspace not found' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting workspace:', error);
+        res.status(500).json({ error: 'Failed to delete workspace' });
+    }
+});
 
+//content routes
 // GET all content in a workspace
+
 app.get('/api/workspaces/:workspaceId/content', async (req, res) => {
     try {
         const { workspaceId } = req.params;
@@ -73,8 +87,11 @@ app.get('/api/workspaces/:workspaceId/content', async (req, res) => {
             'SELECT * FROM Content WHERE WorkspaceID = ? ORDER BY CreatedAt DESC',
             [workspaceId]
         );
+
+
         res.json(content);
-    } catch (error) {
+    } catch (error) 
+	{
         console.error('Error fetching content:', error);
         res.status(500).json({ error: 'Failed to fetch content' });
     }
@@ -89,7 +106,7 @@ app.get('/api/content/:id', async (req, res) => {
             return res.status(404).json({ error: 'Content not found' });
         }
 
-        // Get associated tags
+        // get associated tags
         const tags = await db.query(
             `SELECT t.* FROM Tag t
              JOIN Content_Tag ct ON t.TagID = ct.TagID
@@ -112,7 +129,7 @@ app.post('/api/content', async (req, res) => {
             return res.status(400).json({ error: 'WorkspaceID, Title, and ContentType are required' });
         }
 
-        // Either TextContent or FilePath must be provided
+        // either TextContent or FilePath must be provided
         if (!TextContent && !FilePath) {
             return res.status(400).json({ error: 'Either TextContent or FilePath must be provided' });
         }
@@ -121,18 +138,18 @@ app.post('/api/content', async (req, res) => {
             'INSERT INTO Content (WorkspaceID, Title, ContentType, TextContent, FilePath, Description) VALUES (?, ?, ?, ?, ?, ?)',
             [WorkspaceID, Title, ContentType, TextContent || null, FilePath || null, Description || null]
         );
+
         res.status(201).json({ ContentID: result.insertId, WorkspaceID, Title, ContentType });
-    } catch (error) {
+    } catch (error) 
+	{
         console.error('Error creating content:', error);
         res.status(500).json({ error: 'Failed to create content' });
     }
 });
 
-// ============================================
-// TAG ROUTES
-// ============================================
-
+// tag routes
 // GET all tags in a workspace
+
 app.get('/api/workspaces/:workspaceId/tags', async (req, res) => {
     try {
         const { workspaceId } = req.params;
@@ -140,9 +157,12 @@ app.get('/api/workspaces/:workspaceId/tags', async (req, res) => {
             'SELECT * FROM Tag WHERE WorkspaceID = ? ORDER BY TagName',
             [workspaceId]
         );
+
         res.json(tags);
-    } catch (error) {
-        console.error('Error fetching tags:', error);
+
+    } catch (error) 
+	{
+        console.error('Error fetching tags:',error);
         res.status(500).json({ error: 'Failed to fetch tags' });
     }
 });
@@ -166,11 +186,9 @@ app.post('/api/tags', async (req, res) => {
     }
 });
 
-// ============================================
-// CONTENT_TAG ASSOCIATION ROUTES
-// ============================================
-
+// Content_Tag association routes
 // POST associate a tag with content
+
 app.post('/api/content/:contentId/tags/:tagId', async (req, res) => {
     try {
         const { contentId, tagId } = req.params;
@@ -178,8 +196,10 @@ app.post('/api/content/:contentId/tags/:tagId', async (req, res) => {
             'INSERT INTO Content_Tag (ContentID, TagID) VALUES (?, ?)',
             [contentId, tagId]
         );
+
         res.status(201).json({ ContentID: contentId, TagID: tagId });
-    } catch (error) {
+    } catch (error) 
+	{
         console.error('Error associating tag:', error);
         res.status(500).json({ error: 'Failed to associate tag' });
     }
@@ -193,18 +213,18 @@ app.delete('/api/content/:contentId/tags/:tagId', async (req, res) => {
             'DELETE FROM Content_Tag WHERE ContentID = ? AND TagID = ?',
             [contentId, tagId]
         );
+
         res.json({ success: true });
-    } catch (error) {
+    } catch (error) 
+	{
         console.error('Error removing tag:', error);
         res.status(500).json({ error: 'Failed to remove tag' });
     }
 });
 
-// ============================================
-// COLLECTION ROUTES
-// ============================================
-
+// collection routes
 // GET all collections in a workspace
+
 app.get('/api/workspaces/:workspaceId/collections', async (req, res) => {
     try {
         const { workspaceId } = req.params;
@@ -212,8 +232,11 @@ app.get('/api/workspaces/:workspaceId/collections', async (req, res) => {
             'SELECT * FROM Collection WHERE WorkspaceID = ? ORDER BY CreatedAt DESC',
             [workspaceId]
         );
+
         res.json(collections);
-    } catch (error) {
+
+    } catch (error) 
+	{
         console.error('Error fetching collections:', error);
         res.status(500).json({ error: 'Failed to fetch collections' });
     }
@@ -230,16 +253,14 @@ app.get('/api/collections/:id/content', async (req, res) => {
             [id]
         );
         res.json(content);
-    } catch (error) {
+    } catch (error) 
+	{
         console.error('Error fetching collection content:', error);
         res.status(500).json({ error: 'Failed to fetch collection content' });
     }
 });
 
-// ============================================
-// SAVED SEARCH ROUTES
-// ============================================
-
+// saved search routes
 // GET all saved searches in a workspace
 app.get('/api/workspaces/:workspaceId/saved-searches', async (req, res) => {
     try {
@@ -255,11 +276,79 @@ app.get('/api/workspaces/:workspaceId/saved-searches', async (req, res) => {
     }
 });
 
-// ============================================
-// SNAPSHOT ROUTES
-// ============================================
+// GET tags associated with a saved search
+app.get('/api/saved-searches/:id/tags', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const tags = await db.query(
+            `SELECT t.* FROM Tag t
+             JOIN SavedSearch_Tag sst ON t.TagID = sst.TagID
+             WHERE sst.SavedSearchID = ?`,
+            [id]
+        );
+        res.json(tags);
+    } catch (error) {
+        console.error('Error fetching saved search tags:', error);
+        res.status(500).json({ error: 'Failed to fetch saved search tags' });
+    }
+});
 
+// POST create new saved search
+app.post('/api/saved-searches', async (req, res) => {
+    try {
+        const { WorkspaceID, SearchName, ContentType } = req.body;
+        if (!WorkspaceID || !SearchName) {
+            return res.status(400).json({ error: 'WorkspaceID and SearchName are required' });
+        }
+        const result = await db.query(
+            'INSERT INTO Saved_Search (WorkspaceID, SearchName, ContentType) VALUES (?, ?, ?)',
+            [WorkspaceID, SearchName, ContentType || null]
+        );
+        res.status(201).json({
+            SavedSearchID: result.insertId,
+            WorkspaceID,
+            SearchName,
+            ContentType: ContentType || null,
+        });
+    } catch (error) {
+        console.error('Error creating saved search:', error);
+        res.status(500).json({ error: 'Failed to create saved search' });
+    }
+});
+
+// DELETE a saved search
+app.delete('/api/saved-searches/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await db.query('DELETE FROM Saved_Search WHERE SavedSearchID = ?', [id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Saved search not found' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting saved search:', error);
+        res.status(500).json({ error: 'Failed to delete saved search' });
+    }
+});
+
+// POST associate a tag with a saved search
+app.post('/api/saved-searches/:savedSearchId/tags/:tagId', async (req, res) => {
+    try {
+        const { savedSearchId, tagId } = req.params;
+        await db.query(
+            'INSERT INTO SavedSearch_Tag (SavedSearchID, TagID) VALUES (?, ?)',
+            [savedSearchId, tagId]
+        );
+        res.status(201).json({ SavedSearchID: savedSearchId, TagID: tagId });
+    } catch (error) {
+        console.error('Error associating tag with saved search:', error);
+        res.status(500).json({ error: 'Failed to associate tag with saved search' });
+    }
+});
+
+// snapshot routes
 // GET all snapshots in a workspace
+
 app.get('/api/workspaces/:workspaceId/snapshots', async (req, res) => {
     try {
         const { workspaceId } = req.params;
@@ -274,37 +363,35 @@ app.get('/api/workspaces/:workspaceId/snapshots', async (req, res) => {
     }
 });
 
-// ============================================
-// ERROR HANDLING
-// ============================================
-
+//this is error handling
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({ error: 'Route not found' });
 });
 
-// Error handler
+//error handler
 app.use((err, req, res, next) => {
     console.error('Unhandled error:', err);
     res.status(500).json({ error: 'Internal server error' });
 });
 
-// ============================================
-// STARTUP: Initialize DB fully BEFORE accepting any requests
-// (avoids race conditions from concurrent requests trying to init at once)
-// ============================================
-const PORT = process.env.PORT || 3000;
+//startup (initialize DB fully BEFORE accepting any requests)
+
+const PORT = process.env.PORT|| 3000;
 
 async function startServer() {
     try {
         console.log('Initializing database...');
         await db.initializeDatabase();
+		
         console.log('✓ Database initialized successfully');
 
         app.listen(PORT, () => {
             console.log(`Mosaic server running on http://localhost:${PORT}`);
         });
-    } catch (error) {
+
+    } catch (error) 
+	{
         console.error('FATAL: Failed to initialize database. Server not started.');
         console.error(error);
         process.exit(1);
@@ -313,9 +400,10 @@ async function startServer() {
 
 startServer();
 
-// Graceful shutdown
+//graceful shutdown
 process.on('SIGTERM', async () => {
     console.log('SIGTERM received, shutting down gracefully...');
     await db.closePool();
+
     process.exit(0);
 });
