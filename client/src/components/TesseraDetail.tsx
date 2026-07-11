@@ -53,6 +53,7 @@ function TesseraDetail({
 }: TesseraDetailProps) {
   const { tags, collections, refreshWorkspaceData } = useWorkspace();
 
+  const [title, setTitle] = useState(tessera.Title || "");
   const [description, setDescription] = useState(tessera.Description || "");
   const [markdownContent, setMarkdownContent] = useState(
     tessera.TextContent || ""
@@ -78,6 +79,12 @@ function TesseraDetail({
       ? tessera.FilePath
       : `${API_BASE}${tessera.FilePath}`
     : "";
+
+  useEffect(() => {
+    setTitle(tessera.Title || "");
+    setDescription(tessera.Description || "");
+    setMarkdownContent(tessera.TextContent || "");
+  }, [tessera]);
 
   useEffect(() => {
     async function loadTesseraRelationships() {
@@ -149,6 +156,11 @@ function TesseraDetail({
   );
 
   const saveTesseraChanges = async () => {
+    if (title.trim() === "") {
+      setPropertyWarning("Tessera name cannot be blank.");
+      return false;
+    }
+
     if (tessera.ContentType === "Markdown" && markdownContent.trim() === "") {
       setContentWarning("Markdown content cannot be blank.");
       return false;
@@ -161,6 +173,7 @@ function TesseraDetail({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          Title: title.trim(),
           Description: description,
           TextContent:
             tessera.ContentType === "Markdown" ? markdownContent : undefined,
@@ -346,7 +359,7 @@ function TesseraDetail({
         <iframe
           className="tessera-file-preview"
           src={fileUrl}
-          title={tessera.Title}
+          title={title}
         />
       );
     }
@@ -362,7 +375,7 @@ function TesseraDetail({
         <img
           className="tessera-image-preview"
           src={fileUrl}
-          alt={tessera.Title}
+          alt={title}
         />
       );
     }
@@ -421,7 +434,19 @@ function TesseraDetail({
         </div>
 
         <div className="tessera-page-body">
-          <h1>{tessera.Title}</h1>
+          <input
+            className="tessera-title-input"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+
+              if (e.target.value.trim() === "") {
+                setPropertyWarning("Tessera name cannot be blank.");
+              } else {
+                setPropertyWarning("");
+              }
+            }}
+          />
 
           <div className="tessera-properties">
             <div className="tessera-property-label">Type</div>
