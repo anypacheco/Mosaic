@@ -217,6 +217,7 @@ function TesseraDetail({
 
       await refreshWorkspaceData();
       onClose();
+      window.location.reload();
     } catch (err) {
       console.error("Failed to delete tessera:", err);
       setPropertyWarning("Failed to delete tessera. Please try again.");
