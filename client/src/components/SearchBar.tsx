@@ -2,22 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { FaRegStar } from "react-icons/fa";
 import { useWorkspace } from "../context/WorkspaceContext";
-
-
-import 
-{
+import {
   createSavedSearch as apiCreateSavedSearch,
   deleteSavedSearch as apiDeleteSavedSearch,
   addTagToSavedSearch as apiAddTagToSavedSearch,
   getSavedSearchTags,
   type Tag,
   type ContentType,
+  type Collection,
+  type Content,
 } from "../api/client";
-
 import SaveSearchModal from "./SaveSearch";
 
-function SearchBar() 
-{
+function SearchBar() {
   const {
     tags,
     content,
@@ -25,12 +22,16 @@ function SearchBar()
     savedSearches,
     currentWorkspace,
     refreshWorkspaceData,
-  } =useWorkspace();
+  } = useWorkspace();
 
-  const [open, setOpen]=useState(false);
-  const [searchText, setSearchText]= useState("");
-  const [selectedTags, setSelectedTags] =useState<Tag[]>([]);
-  const [showSaveModal, setShowSaveModal] =useState(false);
+  const [open, setOpen] = useState(false);
+  const [searchText, setSearchText]=useState("");
+  const [selectedTags, setSelectedTags]=useState<Tag[]>([]);
+  const [selectedCollections, setSelectedCollections]=useState<Collection[]>([]);
+
+  const [selectedContent, setSelectedContent]=useState<Content[]>([]);
+  const [showSaveModal, setShowSaveModal]=useState(false);
+  
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,15 +53,22 @@ function SearchBar()
 
   const availableTags = tags.filter(
     (tag) =>
-      !selectedTags.some((selected) => selected.TagID === tag.TagID) && tag.TagName.toLowerCase().includes(searchText.toLowerCase())
+      !selectedTags.some((selected) => selected.TagID === tag.TagID) &&
+      tag.TagName.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const matchingContent = content.filter((item) =>
-    item.Title.toLowerCase().includes(searchText.toLowerCase())
+  const matchingContent = content.filter(
+    (item) =>
+      !selectedContent.some((selected) => selected.ContentID === item.ContentID) &&
+      item.Title.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const matchingCollections = collections.filter((collection) =>
-    collection.CollectionName.toLowerCase().includes(searchText.toLowerCase())
+  const matchingCollections = collections.filter(
+    (collection) =>
+      !selectedCollections.some(
+        (selected) => selected.CollectionID === collection.CollectionID
+      ) &&
+      collection.CollectionName.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const matchingSavedSearches = savedSearches.filter((search) =>
@@ -75,6 +83,32 @@ function SearchBar()
 
   const removeTag = (tagId: number) => {
     setSelectedTags(selectedTags.filter((tag) => tag.TagID !== tagId));
+  };
+
+  const addCollection = (collection: Collection) => {
+    setSelectedCollections([...selectedCollections, collection]);
+    setSearchText("");
+    setOpen(true);
+  };
+
+  const removeCollection = (collectionId: number) => {
+    setSelectedCollections(
+      selectedCollections.filter(
+        (collection) => collection.CollectionID !== collectionId
+      )
+    );
+  };
+
+  const addContent = (item: Content) => {
+    setSelectedContent([...selectedContent, item]);
+    setSearchText("");
+    setOpen(true);
+  };
+
+  const removeContent = (contentId: number) => {
+    setSelectedContent(
+      selectedContent.filter((item) => item.ContentID !== contentId)
+    );
   };
 
   const saveSearch = async (name: string, contentType: ContentType) => {
@@ -96,9 +130,7 @@ function SearchBar()
       await refreshWorkspaceData();
       setShowSaveModal(false);
       setOpen(true);
-
-    } catch (err) 
-	{
+    } catch (err) {
       console.error("Failed to save search:", err);
     }
   };
@@ -115,10 +147,7 @@ function SearchBar()
       setSelectedTags(linkedTags);
       setSearchText(savedSearch.SearchName);
       setOpen(false);
-
-    } catch (err) 
-	
-	{
+    } catch (err) {
       console.error("Failed to load saved search:", err);
     }
   };
@@ -137,7 +166,7 @@ function SearchBar()
     }
   };
 
-  const handleSearchSubmit =() => {
+  const handleSearchSubmit = () => {
     setOpen(false);
   };
 
@@ -159,9 +188,28 @@ function SearchBar()
 
         <div className="search-input-area">
           {selectedTags.map((tag) => (
-            <span className="search-chip" key={tag.TagID}>
+            <span className="search-chip" key={`tag-${tag.TagID}`}>
               {tag.TagName}
               <button onClick={() => removeTag(tag.TagID)}>x</button>
+            </span>
+          ))}
+
+          {selectedCollections.map((collection) => (
+            <span
+              className="search-chip"
+              key={`collection-${collection.CollectionID}`}
+            >
+              {collection.CollectionName}
+              <button onClick={() => removeCollection(collection.CollectionID)}>
+                x
+              </button>
+            </span>
+          ))}
+
+          {selectedContent.map((item) => (
+            <span className="search-chip" key={`content-${item.ContentID}`}>
+              {item.Title}
+              <button onClick={() => removeContent(item.ContentID)}>x</button>
             </span>
           ))}
 
@@ -174,7 +222,9 @@ function SearchBar()
             }}
             onKeyDown={handleKeyDown}
             placeholder={
-              selectedTags.length === 0
+              selectedTags.length === 0 &&
+              selectedCollections.length === 0 &&
+              selectedContent.length === 0
                 ? "Search files, tags, collections, or content..."
                 : "Search..."
             }
@@ -246,7 +296,11 @@ function SearchBar()
               <h4>Collections</h4>
 
               {matchingCollections.map((collection) => (
-                <button className="picker-row" key={collection.CollectionID}>
+                <button
+                  className="picker-row"
+                  key={collection.CollectionID}
+                  onClick={() => addCollection(collection)}
+                >
                   {collection.CollectionName}
                 </button>
               ))}
@@ -258,7 +312,11 @@ function SearchBar()
               <h4>Tesserae</h4>
 
               {matchingContent.map((item) => (
-                <button className="picker-row" key={item.ContentID}>
+                <button
+                  className="picker-row"
+                  key={item.ContentID}
+                  onClick={() => addContent(item)}
+                >
                   {item.Title}
                 </button>
               ))}

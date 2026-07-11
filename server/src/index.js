@@ -177,7 +177,11 @@ app.post('/api/content', async (req, res) => {
 app.patch('/api/content/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { Description, TextContent } = req.body;
+        const { Title, Description, TextContent } = req.body;
+
+        if (Title !== undefined && Title.trim() === '') {
+            return res.status(400).json({ error: 'Title cannot be blank' });
+        }
 
         if (TextContent !== undefined && TextContent.trim() === '') {
             return res.status(400).json({ error: 'Markdown content cannot be blank' });
@@ -185,6 +189,11 @@ app.patch('/api/content/:id', async (req, res) => {
 
         const updates = [];
         const values = [];
+
+        if (Title !== undefined) {
+            updates.push('Title = ?');
+            values.push(Title);
+        }
 
         if (Description !== undefined) {
             updates.push('Description = ?');

@@ -10,6 +10,9 @@ import {
 
 const API_BASE = "http://localhost:3000";
 
+const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
+const DEFAULT_TAG_COLOR = "#9B5DE5";
+
 type TesseraDetailProps = {
   tessera: Content;
   collection?: Collection;
@@ -53,6 +56,7 @@ function TesseraDetail({
 }: TesseraDetailProps) {
   const { tags, collections, refreshWorkspaceData } = useWorkspace();
 
+  const [title, setTitle] = useState(tessera.Title || "");
   const [description, setDescription] = useState(tessera.Description || "");
   const [markdownContent, setMarkdownContent] = useState(
     tessera.TextContent || ""
@@ -63,6 +67,9 @@ function TesseraDetail({
   const [editingTags, setEditingTags] = useState(false);
   const [editingCollections, setEditingCollections] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
+
+  const [newTagColor, setNewTagColor] = useState(DEFAULT_TAG_COLOR);
+
   const [collectionSearch, setCollectionSearch] = useState("");
 
   const tagsPickerRef = useRef<HTMLDivElement>(null);
@@ -78,6 +85,12 @@ function TesseraDetail({
       ? tessera.FilePath
       : `${API_BASE}${tessera.FilePath}`
     : "";
+
+  useEffect(() => {
+    setTitle(tessera.Title || "");
+    setDescription(tessera.Description || "");
+    setMarkdownContent(tessera.TextContent || "");
+  }, [tessera]);
 
   useEffect(() => {
     async function loadTesseraRelationships() {
@@ -149,6 +162,11 @@ function TesseraDetail({
   );
 
   const saveTesseraChanges = async () => {
+    if (title.trim() === "") {
+      setPropertyWarning("Tessera name cannot be blank.");
+      return false;
+    }
+
     if (tessera.ContentType === "Markdown" && markdownContent.trim() === "") {
       setContentWarning("Markdown content cannot be blank.");
       return false;
@@ -161,6 +179,7 @@ function TesseraDetail({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          Title: title.trim(),
           Description: description,
           TextContent:
             tessera.ContentType === "Markdown" ? markdownContent : undefined,
@@ -232,11 +251,16 @@ function TesseraDetail({
       return;
     }
 
+	if (!HEX_COLOR_REGEX.test(newTagColor)) {
+      setPropertyWarning("Enter a valid hex color like #9B5DE5.");
+      return;
+    }
+
     try {
       const newTag = await apiCreateTag({
         WorkspaceID: tessera.WorkspaceID,
         TagName: tagSearch.trim(),
-        HexColor: "#9B5DE5",
+        HexColor: newTagColor,
       });
 
       await apiRequest(
@@ -246,6 +270,7 @@ function TesseraDetail({
 
       setSelectedTags([...selectedTags, newTag]);
       setTagSearch("");
+	  setNewTagColor(DEFAULT_TAG_COLOR);
       setPropertyWarning("");
       await refreshWorkspaceData();
     } catch (err) {
@@ -346,7 +371,7 @@ function TesseraDetail({
         <iframe
           className="tessera-file-preview"
           src={fileUrl}
-          title={tessera.Title}
+          title={title}
         />
       );
     }
@@ -362,7 +387,7 @@ function TesseraDetail({
         <img
           className="tessera-image-preview"
           src={fileUrl}
-          alt={tessera.Title}
+          alt={title}
         />
       );
     }
@@ -421,7 +446,19 @@ function TesseraDetail({
         </div>
 
         <div className="tessera-page-body">
-          <h1>{tessera.Title}</h1>
+          <input
+            className="tessera-title-input"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+
+              if (e.target.value.trim() === "") {
+                setPropertyWarning("Tessera name cannot be blank.");
+              } else {
+                setPropertyWarning("");
+              }
+            }}
+          />
 
           <div className="tessera-properties">
             <div className="tessera-property-label">Type</div>
@@ -486,10 +523,27 @@ function TesseraDetail({
                   ))}
 
                   {tagSearch.trim() !== "" && !tagAlreadyExists && (
-                    <button onClick={createTag}>
-                      Create <span>{tagSearch}</span>
-                    </button>
-                  )}
+					<div className="create-tag-row">
+						<input
+							type="color"
+							className="tag-color-swatch"
+							value={newTagColor}
+							onChange={(e) => setNewTagColor(e.target.value)}
+							title="Pick a color"
+						/>
+						<input
+							type="text"
+							className="tag-color-input"
+							value={newTagColor}
+							onChange={(e) => setNewTagColor(e.target.value)}
+							placeholder="#RRGGBB"
+							maxLength={7}
+						/>
+						<button onClick={createTag}>
+							Create <span>{tagSearch.trim()}</span>
+						</button>
+					</div>
+				  )}
                 </div>
               )}
             </div>
