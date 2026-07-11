@@ -188,6 +188,72 @@ app.post('/api/content', async (req, res) => {
     }
 });
 
+// PATCH update content by ID
+app.patch('/api/content/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { Description, TextContent } = req.body;
+
+        if (TextContent !== undefined && TextContent.trim() === '') {
+            return res.status(400).json({ error: 'Markdown content cannot be blank' });
+        }
+
+        const updates = [];
+        const values = [];
+
+        if (Description !== undefined) {
+            updates.push('Description = ?');
+            values.push(Description);
+        }
+
+        if (TextContent !== undefined) {
+            updates.push('TextContent = ?');
+            values.push(TextContent);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        values.push(id);
+
+        const result = await db.query(
+            `UPDATE Content SET ${updates.join(', ')} WHERE ContentID = ?`,
+            values
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Content not found' });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating content:', error);
+        res.status(500).json({ error: 'Failed to update content' });
+    }
+});
+
+// DELETE content by ID
+app.delete('/api/content/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await db.query(
+            'DELETE FROM Content WHERE ContentID = ?',
+            [id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Content not found' });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting content:', error);
+        res.status(500).json({ error: 'Failed to delete content' });
+    }
+});
+
 // tag routes
 // GET all tags in a workspace
 
@@ -280,6 +346,53 @@ app.get('/api/workspaces/:workspaceId/collections', async (req, res) => {
 	{
         console.error('Error fetching collections:', error);
         res.status(500).json({ error: 'Failed to fetch collections' });
+    }
+});
+
+// POST create new collection
+app.post('/api/collections', async (req, res) => {
+    try {
+        const { WorkspaceID, CollectionName, Description } = req.body;
+
+        if (!WorkspaceID || !CollectionName) {
+            return res.status(400).json({ error: 'WorkspaceID and CollectionName are required' });
+        }
+
+        const result = await db.query(
+            'INSERT INTO Collection (WorkspaceID, CollectionName, Description) VALUES (?, ?, ?)',
+            [WorkspaceID, CollectionName, Description || null]
+        );
+
+        res.status(201).json({
+            CollectionID: result.insertId,
+            WorkspaceID,
+            CollectionName,
+            Description: Description || null,
+        });
+    } catch (error) {
+        console.error('Error creating collection:', error);
+        res.status(500).json({ error: 'Failed to create collection' });
+    }
+});
+
+// DELETE collection by ID
+app.delete('/api/collections/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await db.query(
+            'DELETE FROM Collection WHERE CollectionID = ?',
+            [id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Collection not found' });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting collection:', error);
+        res.status(500).json({ error: 'Failed to delete collection' });
     }
 });
 
