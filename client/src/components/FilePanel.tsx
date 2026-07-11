@@ -15,6 +15,10 @@ const MAX_FILE_SIZE_MB = 500;
 const acceptedFileTypes = ".md,.pdf,.png,.jpg,.jpeg,.mp3,.mp4";
 const API_BASE = "http://localhost:3000";
 
+//color for new tags 
+const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
+const DEFAULT_TAG_COLOR = "#9B5DE5";
+
 function getContentType(fileName: string): ContentType | null {
   const extension = fileName.split(".").pop()?.toLowerCase();
 
@@ -43,6 +47,8 @@ function FilePanel() {
   const [editingTags, setEditingTags] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+
+  const [newTagColor, setNewTagColor] = useState(DEFAULT_TAG_COLOR);
 
   const [formWarning, setFormWarning] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -104,16 +110,22 @@ function FilePanel() {
       return;
     }
 
+	if (!HEX_COLOR_REGEX.test(newTagColor)) {
+      setFormWarning("Enter a valid hex color like #9B5DE5.");
+      return;
+    }
+
     try {
       const newTag = await apiCreateTag({
         WorkspaceID: currentWorkspace.WorkspaceID,
         TagName: tagSearch.trim(),
-        HexColor: "#9B5DE5",
+        HexColor: newTagColor,
       });
 
       await refreshWorkspaceData();
       setSelectedTags([...selectedTags, newTag]);
       setTagSearch("");
+	  setNewTagColor(DEFAULT_TAG_COLOR);
       setFormWarning("");
     } catch (err) {
       console.error("Failed to create tag:", err);
@@ -339,10 +351,27 @@ function FilePanel() {
                   ))}
 
                   {tagSearch.trim() !== "" && !tagAlreadyExists && (
-                    <button onClick={createTag}>
-                      Create <span>{tagSearch.trim()}</span>
-                    </button>
-                  )}
+					<div className="create-tag-row">
+						<input
+							type="color"
+							className="tag-color-swatch"
+							value={newTagColor}
+							onChange={(e) => setNewTagColor(e.target.value)}
+							title="Pick a color"
+						/>
+						<input
+							type="text"
+							className="tag-color-input"
+							value={newTagColor}
+							onChange={(e) => setNewTagColor(e.target.value)}
+							placeholder="#RRGGBB"
+							maxLength={7}
+						/>
+						<button onClick={createTag}>
+							Create <span>{tagSearch.trim()}</span>
+						</button>
+					</div>
+				  )}
                 </div>
               )}
             </div>

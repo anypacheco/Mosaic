@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { FaRegStar } from "react-icons/fa";
 import { useWorkspace } from "../context/WorkspaceContext";
-
 import {
   createSavedSearch as apiCreateSavedSearch,
   deleteSavedSearch as apiDeleteSavedSearch,
@@ -14,7 +13,6 @@ import {
   type ContentType,
   type SavedSearch,
 } from "../api/client";
-
 import SaveSearchModal from "./SaveSearch";
 import TesseraDetail from "./TesseraDetail";
 

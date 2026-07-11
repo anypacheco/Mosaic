@@ -10,6 +10,9 @@ import {
 
 const API_BASE = "http://localhost:3000";
 
+const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
+const DEFAULT_TAG_COLOR = "#9B5DE5";
+
 type TesseraDetailProps = {
   tessera: Content;
   collection?: Collection;
@@ -64,6 +67,9 @@ function TesseraDetail({
   const [editingTags, setEditingTags] = useState(false);
   const [editingCollections, setEditingCollections] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
+
+  const [newTagColor, setNewTagColor] = useState(DEFAULT_TAG_COLOR);
+
   const [collectionSearch, setCollectionSearch] = useState("");
 
   const tagsPickerRef = useRef<HTMLDivElement>(null);
@@ -245,11 +251,16 @@ function TesseraDetail({
       return;
     }
 
+	if (!HEX_COLOR_REGEX.test(newTagColor)) {
+      setPropertyWarning("Enter a valid hex color like #9B5DE5.");
+      return;
+    }
+
     try {
       const newTag = await apiCreateTag({
         WorkspaceID: tessera.WorkspaceID,
         TagName: tagSearch.trim(),
-        HexColor: "#9B5DE5",
+        HexColor: newTagColor,
       });
 
       await apiRequest(
@@ -259,6 +270,7 @@ function TesseraDetail({
 
       setSelectedTags([...selectedTags, newTag]);
       setTagSearch("");
+	  setNewTagColor(DEFAULT_TAG_COLOR);
       setPropertyWarning("");
       await refreshWorkspaceData();
     } catch (err) {
@@ -511,10 +523,27 @@ function TesseraDetail({
                   ))}
 
                   {tagSearch.trim() !== "" && !tagAlreadyExists && (
-                    <button onClick={createTag}>
-                      Create <span>{tagSearch}</span>
-                    </button>
-                  )}
+					<div className="create-tag-row">
+						<input
+							type="color"
+							className="tag-color-swatch"
+							value={newTagColor}
+							onChange={(e) => setNewTagColor(e.target.value)}
+							title="Pick a color"
+						/>
+						<input
+							type="text"
+							className="tag-color-input"
+							value={newTagColor}
+							onChange={(e) => setNewTagColor(e.target.value)}
+							placeholder="#RRGGBB"
+							maxLength={7}
+						/>
+						<button onClick={createTag}>
+							Create <span>{tagSearch.trim()}</span>
+						</button>
+					</div>
+				  )}
                 </div>
               )}
             </div>
