@@ -276,3 +276,9 @@ export function addTagToSavedSearch(
 export function getWorkspaceSnapshots(workspaceId: number): Promise<Snapshot[]> {
   return getJSON<Snapshot[]>(`${API_BASE}/workspaces/${workspaceId}/snapshots`);
 }
+
+export function createSnapshot(workspaceId: number, snapshotName: string): Promise<{ success: boolean; snapshotId: number }> {
+  return postJSON<{ success: boolean; snapshotId: number }>(`${API_BASE}/workspaces/${workspaceId}/snapshots`, {
+    SnapshotName: snapshotName
+  });
+}
