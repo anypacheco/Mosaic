@@ -3,35 +3,65 @@ import type React from "react";
 import { FaRegStar } from "react-icons/fa";
 import { useWorkspace } from "../context/WorkspaceContext";
 
-
-import 
-{
+import {
   createSavedSearch as apiCreateSavedSearch,
   deleteSavedSearch as apiDeleteSavedSearch,
   addTagToSavedSearch as apiAddTagToSavedSearch,
   getSavedSearchTags,
+  getContent,
   type Tag,
+  type Content,
   type ContentType,
+  type SavedSearch,
 } from "../api/client";
 
 import SaveSearchModal from "./SaveSearch";
+import TesseraDetail from "./TesseraDetail";
 
-function SearchBar() 
-{
+function SearchBar() {
   const {
     tags,
     content,
-    collections,
     savedSearches,
     currentWorkspace,
     refreshWorkspaceData,
-  } =useWorkspace();
+  } = useWorkspace();
 
-  const [open, setOpen]=useState(false);
-  const [searchText, setSearchText]= useState("");
-  const [selectedTags, setSelectedTags] =useState<Tag[]>([]);
-  const [showSaveModal, setShowSaveModal] =useState(false);
+  const [open, setOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  const [selectedSavedSearch, setSelectedSavedSearch] =
+    useState<SavedSearch | null>(null);
+  const [selectedTessera, setSelectedTessera] = useState<Content | null>(null);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [contentTagMap, setContentTagMap] = useState<Record<number, Tag[]>>({});
   const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function loadContentTags() {
+      try {
+        const contentWithTags = await Promise.all(
+          content.map((item) => getContent(item.ContentID))
+        );
+
+        const nextTagMap: Record<number, Tag[]> = {};
+
+        contentWithTags.forEach((item) => {
+          nextTagMap[item.ContentID] = item.tags || [];
+        });
+
+        setContentTagMap(nextTagMap);
+      } catch (err) {
+        console.error("Failed to load content tags:", err);
+      }
+    }
+
+    if (content.length > 0) {
+      loadContentTags();
+    } else {
+      setContentTagMap({});
+    }
+  }, [content]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -50,22 +80,39 @@ function SearchBar()
     };
   }, []);
 
+  const hasActiveFilter = selectedTags.length > 0 || selectedSavedSearch !== null;
+
   const availableTags = tags.filter(
     (tag) =>
-      !selectedTags.some((selected) => selected.TagID === tag.TagID) && tag.TagName.toLowerCase().includes(searchText.toLowerCase())
-  );
-
-  const matchingContent = content.filter((item) =>
-    item.Title.toLowerCase().includes(searchText.toLowerCase())
-  );
-
-  const matchingCollections = collections.filter((collection) =>
-    collection.CollectionName.toLowerCase().includes(searchText.toLowerCase())
+      !selectedTags.some((selected) => selected.TagID === tag.TagID) &&
+      tag.TagName.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const matchingSavedSearches = savedSearches.filter((search) =>
     search.SearchName.toLowerCase().includes(searchText.toLowerCase())
   );
+
+  const matchingTesserae = hasActiveFilter
+    ? content.filter((item) => {
+        const searchValue = searchText.trim().toLowerCase();
+
+        const textMatches =
+          searchValue === "" ||
+          item.Title.toLowerCase().includes(searchValue) ||
+          item.Description?.toLowerCase().includes(searchValue) ||
+          item.TextContent?.toLowerCase().includes(searchValue);
+
+        const itemTags = contentTagMap[item.ContentID] || [];
+
+        const tagMatches =
+          selectedTags.length === 0 ||
+          selectedTags.every((selectedTag) =>
+            itemTags.some((tag) => tag.TagID === selectedTag.TagID)
+          );
+
+        return textMatches && tagMatches;
+      })
+    : [];
 
   const addTag = (tag: Tag) => {
     setSelectedTags([...selectedTags, tag]);
@@ -75,16 +122,27 @@ function SearchBar()
 
   const removeTag = (tagId: number) => {
     setSelectedTags(selectedTags.filter((tag) => tag.TagID !== tagId));
+
+    if (selectedSavedSearch) {
+      setSelectedSavedSearch(null);
+    }
   };
 
-  const saveSearch = async (name: string, contentType: ContentType) => {
+  const clearSavedSearch = () => {
+    setSelectedSavedSearch(null);
+    setSelectedTags([]);
+    setSearchText("");
+    setOpen(true);
+  };
+
+  const saveSearch = async (name: string, contentType: ContentType | "") => {
     if (!currentWorkspace) return;
 
     try {
       const newSavedSearch = await apiCreateSavedSearch({
         WorkspaceID: currentWorkspace.WorkspaceID,
         SearchName: name,
-        ContentType: contentType,
+        ContentType: contentType || undefined,
       });
 
       await Promise.all(
@@ -96,9 +154,7 @@ function SearchBar()
       await refreshWorkspaceData();
       setShowSaveModal(false);
       setOpen(true);
-
-    } catch (err) 
-	{
+    } catch (err) {
       console.error("Failed to save search:", err);
     }
   };
@@ -112,13 +168,11 @@ function SearchBar()
 
     try {
       const linkedTags = await getSavedSearchTags(savedSearchId);
+      setSelectedSavedSearch(savedSearch);
       setSelectedTags(linkedTags);
-      setSearchText(savedSearch.SearchName);
-      setOpen(false);
-
-    } catch (err) 
-	
-	{
+      setSearchText("");
+      setOpen(true);
+    } catch (err) {
       console.error("Failed to load saved search:", err);
     }
   };
@@ -131,13 +185,29 @@ function SearchBar()
 
     try {
       await apiDeleteSavedSearch(savedSearchId);
+
+      if (selectedSavedSearch?.SavedSearchID === savedSearchId) {
+        setSelectedSavedSearch(null);
+        setSelectedTags([]);
+      }
+
       await refreshWorkspaceData();
     } catch (err) {
       console.error("Failed to delete saved search:", err);
     }
   };
 
-  const handleSearchSubmit =() => {
+  const openTessera = (item: Content) => {
+    setSelectedTessera(item);
+    setOpen(false);
+  };
+
+  const closeTessera = async () => {
+    await refreshWorkspaceData();
+    setSelectedTessera(null);
+  };
+
+  const handleSearchSubmit = () => {
     setOpen(false);
   };
 
@@ -153,128 +223,157 @@ function SearchBar()
   };
 
   return (
-    <div className="search-wrapper" ref={wrapperRef}>
-      <div className={open ? "search-main search-open" : "search-main"}>
-        <span className="search-icon">⌕</span>
+    <>
+      <div className="search-wrapper" ref={wrapperRef}>
+        <div className={open ? "search-main search-open" : "search-main"}>
+          <span className="search-icon">⌕</span>
 
-        <div className="search-input-area">
-          {selectedTags.map((tag) => (
-            <span className="search-chip" key={tag.TagID}>
-              {tag.TagName}
-              <button onClick={() => removeTag(tag.TagID)}>x</button>
-            </span>
-          ))}
+          <div className="search-input-area">
+            {selectedSavedSearch && (
+              <span className="search-chip">
+                {selectedSavedSearch.SearchName}
+                <button onClick={clearSavedSearch}>x</button>
+              </span>
+            )}
 
-          <input
-            value={searchText}
-            onFocus={() => setOpen(true)}
-            onChange={(e) => {
-              setSearchText(e.target.value);
-              setOpen(true);
+            {selectedTags.map((tag) => (
+              <span className="search-chip" key={tag.TagID}>
+                {tag.TagName}
+                <button onClick={() => removeTag(tag.TagID)}>x</button>
+              </span>
+            ))}
+
+            <input
+              value={searchText}
+              onFocus={() => setOpen(true)}
+              onChange={(e) => {
+                setSearchText(e.target.value);
+                setOpen(true);
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                hasActiveFilter
+                  ? "Search matching tesserae..."
+                  : "Search tags or saved searches..."
+              }
+            />
+          </div>
+
+          <button
+            className="save-search-icon"
+            title="Save Search"
+            onClick={() => {
+              setOpen(false);
+              setShowSaveModal(true);
             }}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              selectedTags.length === 0
-                ? "Search files, tags, collections, or content..."
-                : "Search..."
-            }
-          />
+          >
+            <FaRegStar />
+          </button>
         </div>
 
-        <button
-          className="save-search-icon"
-          title="Save Search"
-          onClick={() => {
-            setOpen(false);
-            setShowSaveModal(true);
-          }}
-        >
-          <FaRegStar />
-        </button>
+        {open && (
+          <div className="filter-dropdown search-picker">
+            <p>
+              {hasActiveFilter
+                ? "Open a matching tessera or refine with tags"
+                : "Choose a tag or saved search to see matching tesserae"}
+            </p>
+
+            {hasActiveFilter && matchingTesserae.length > 0 && (
+              <div className="search-section">
+                <h4>Results</h4>
+
+                <div className="search-results-list">
+                  {matchingTesserae.map((item) => (
+                    <button
+                      className="picker-row search-result-row"
+                      key={item.ContentID}
+                      onClick={() => openTessera(item)}
+                    >
+                      <span>{item.Title}</span>
+                      <span className="search-result-type">
+                        {item.ContentType}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {matchingSavedSearches.length > 0 && (
+              <div className="search-section">
+                <h4>Saved Searches</h4>
+
+                <div className="search-options-list">
+                  {matchingSavedSearches.map((search) => (
+                    <button
+                      className="picker-row saved-search-row"
+                      key={search.SavedSearchID}
+                      onClick={() => loadSavedSearch(search.SavedSearchID)}
+                    >
+                      <span>{search.SearchName}</span>
+
+                      <button
+                        className="delete-saved-search"
+                        title="Delete Saved Search"
+                        onClick={(e) =>
+                          deleteSavedSearch(e, search.SavedSearchID)
+                        }
+                      >
+                        x
+                      </button>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {availableTags.length > 0 && (
+              <div className="search-section">
+                <h4>Tags</h4>
+
+                <div className="search-options-list">
+                  {availableTags.map((tag) => (
+                    <button
+                      className="picker-row"
+                      key={tag.TagID}
+                      onClick={() => addTag(tag)}
+                    >
+                      <span
+                        className="tag-dot"
+                        style={{ backgroundColor: tag.HexColor }}
+                      />
+                      <span>{tag.TagName}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {hasActiveFilter &&
+              matchingTesserae.length === 0 &&
+              matchingSavedSearches.length === 0 &&
+              availableTags.length === 0 && <p>No matches found</p>}
+          </div>
+        )}
+
+        {showSaveModal && (
+          <SaveSearchModal
+            selectedTags={selectedTags}
+            onCancel={() => setShowSaveModal(false)}
+            onSave={saveSearch}
+          />
+        )}
       </div>
 
-      {open && (
-        <div className="filter-dropdown search-picker">
-          <p>Select a tag, collection, or tessera</p>
-
-          {matchingSavedSearches.length > 0 && (
-            <>
-              <h4>Saved Searches</h4>
-
-              {matchingSavedSearches.map((search) => (
-                <button
-                  className="picker-row saved-search-row"
-                  key={search.SavedSearchID}
-                  onClick={() => loadSavedSearch(search.SavedSearchID)}
-                >
-                  <span>{search.SearchName}</span>
-
-                  <button
-                    className="delete-saved-search"
-                    title="Delete Saved Search"
-                    onClick={(e) => deleteSavedSearch(e, search.SavedSearchID)}
-                  >
-                    x
-                  </button>
-                </button>
-              ))}
-            </>
-          )}
-
-          {availableTags.length > 0 && (
-            <>
-              <h4>Tags</h4>
-
-              {availableTags.map((tag) => (
-                <button
-                  className="picker-row"
-                  key={tag.TagID}
-                  onClick={() => addTag(tag)}
-                >
-                  <span
-                    className="tag-dot"
-                    style={{ backgroundColor: tag.HexColor }}
-                  />
-                  <span>{tag.TagName}</span>
-                </button>
-              ))}
-            </>
-          )}
-
-          {matchingCollections.length > 0 && (
-            <>
-              <h4>Collections</h4>
-
-              {matchingCollections.map((collection) => (
-                <button className="picker-row" key={collection.CollectionID}>
-                  {collection.CollectionName}
-                </button>
-              ))}
-            </>
-          )}
-
-          {matchingContent.length > 0 && (
-            <>
-              <h4>Tesserae</h4>
-
-              {matchingContent.map((item) => (
-                <button className="picker-row" key={item.ContentID}>
-                  {item.Title}
-                </button>
-              ))}
-            </>
-          )}
-        </div>
-      )}
-
-      {showSaveModal && (
-        <SaveSearchModal
-          selectedTags={selectedTags}
-          onCancel={() => setShowSaveModal(false)}
-          onSave={saveSearch}
+      {selectedTessera && (
+        <TesseraDetail
+          tessera={selectedTessera}
+          onClose={closeTessera}
+          onRemoveFromCollection={closeTessera}
         />
       )}
-    </div>
+    </>
   );
 }
 

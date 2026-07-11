@@ -7,7 +7,7 @@ type SaveSearchModalProps = {
     TagName: string;
   }[];
   onCancel: () => void;
-  onSave: (name: string, contentType: ContentType) => void;
+  onSave: (name: string, contentType: ContentType | "") => void;
 };
 
 function SaveSearchModal({
@@ -16,7 +16,7 @@ function SaveSearchModal({
   onSave,
 }: SaveSearchModalProps) {
   const [searchName, setSearchName] = useState("");
-  const [contentType, setContentType] = useState<ContentType>("Markdown");
+  const [contentType, setContentType] = useState<ContentType | "">("");
 
   return (
     <div className="modal-backdrop">
@@ -32,8 +32,9 @@ function SaveSearchModal({
         <label>Content Type</label>
         <select
           value={contentType}
-          onChange={(e) => setContentType(e.target.value as ContentType)}
+          onChange={(e) => setContentType(e.target.value as ContentType | "")}
         >
+          <option value="">Any</option>
           <option value="Markdown">Markdown</option>
           <option value="PDF">PDF</option>
           <option value="Image">Image</option>
@@ -54,6 +55,7 @@ function SaveSearchModal({
 
         <div className="modal-actions">
           <button onClick={onCancel}>Cancel</button>
+
           <button
             onClick={() => {
               if (searchName.trim() === "") return;
