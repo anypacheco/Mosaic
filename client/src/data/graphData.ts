@@ -1,91 +1,67 @@
-import {
-  content,
-  tags,
-  contentTags
-} from "./mockData";
-// Node types used by the graph
-export type GraphNodeType =
-  | "content"
-  | "tag";
-// A node displayed in Cytoscape
 export interface GraphNode {
-  // unique identifier
   id: string;
-  // what kind of node it is
-  type: GraphNodeType;
-  // text shown on screen
+  type: "content" | "tag";
   label: string;
-  // used for tag colors
   color?: string;
 }
-// Connection between two nodes
+
 export interface GraphEdge {
   id: string;
   source: string;
   target: string;
 }
-// Full graph object
+
 export interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];
 }
-export function createGraphData(
-  workspaceId: number
-): GraphData {
 
+export function createGraphData(
+  workspaceId: number,
+  contentList: any[],
+  tagsList: any[],
+  contentTagsList: any[]
+): GraphData {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
+  const numericWorkspaceId = Number(workspaceId);
 
-  const workspaceContent = content.filter(
-    item =>
-      item.WorkspaceID === workspaceId
+  // 1. Filter and map Content
+  const workspaceContent = contentList.filter(
+    (item) => Number(item.WorkspaceID) === numericWorkspaceId
   );
-
-  workspaceContent.forEach(item => {
+  workspaceContent.forEach((item) => {
     nodes.push({
       id: `content-${item.ContentID}`,
       type: "content",
-      label: item.Title
+      label: item.Title || "Untitled Tessera",
     });
   });
 
-  const workspaceTags = tags.filter(
-    tag =>
-      tag.WorkspaceID === workspaceId
+  // 2. Filter and map Tags
+  const workspaceTags = tagsList.filter(
+    (tag) => Number(tag.WorkspaceID) === numericWorkspaceId
   );
-
-  workspaceTags.forEach(tag => {
+  workspaceTags.forEach((tag) => {
     nodes.push({
       id: `tag-${tag.TagID}`,
       type: "tag",
       label: tag.TagName,
-      color: tag.HexColor
+      color: tag.HexColor || "#9B5DE5",
     });
   });
 
-  const workspaceContentIds =
-    workspaceContent.map(
-      item => item.ContentID
-    );
-  contentTags.forEach(connection => {
-    // only include this workspace's content
-    if (
-      workspaceContentIds.includes(
-        connection.ContentID
-      )
-    ) {
+  // 3. Map Connections
+  const workspaceContentIds = workspaceContent.map((item) => item.ContentID);
+  contentTagsList.forEach((connection) => {
+    if (workspaceContentIds.includes(connection.ContentID)) {
       edges.push({
-        id:
-          `edge-${connection.ContentID}-${connection.TagID}`,
-        source:
-          `content-${connection.ContentID}`,
-        target:
-          `tag-${connection.TagID}`
+        id: `edge-${connection.ContentID}-${connection.TagID}`,
+        source: `content-${connection.ContentID}`,
+        target: `tag-${connection.TagID}`,
       });
     }
   });
-  return {
-    nodes,
-    edges
-  };
+
+  return { nodes, edges };
 }
