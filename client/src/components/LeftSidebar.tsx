@@ -19,9 +19,8 @@ function LeftSidebar() {
   const { currentWorkspace, collections, refreshWorkspaceData } = useWorkspace();
 
   const [openCollectionId, setOpenCollectionId] = useState<number | null>(null);
-  const [collectionItemsById, setCollectionItemsById] = useState
-    Record<number, Content[]>
-  >({});
+
+  const [collectionItemsById, setCollectionItemsById] = useState<Record<number, Content[]>>({});
 
   const [selectedTessera, setSelectedTessera] = useState<Content | null>(null);
   const [selectedCollection, setSelectedCollection] =
