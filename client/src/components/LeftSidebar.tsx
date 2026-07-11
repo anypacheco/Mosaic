@@ -1,82 +1,105 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useWorkspace } from "../context/WorkspaceContext";
-import {
-  createCollection as apiCreateCollection,
-  deleteCollection as apiDeleteCollection,
-  getCollectionContent,
-  type Collection,
-  type Content,
-} from "../api/client";
+import type { Collection, Content } from "../api/client";
 import TesseraDetail from "./TesseraDetail";
 
+const API_BASE = "http://localhost:3000";
+
+async function apiRequest(path: string, options?: RequestInit) {
+  const response = await fetch(`${API_BASE}${path}`, options);
+
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 function LeftSidebar() {
-  const { collections, currentWorkspace, refreshWorkspaceData } =
-    useWorkspace();
+  const { currentWorkspace, collections, refreshWorkspaceData } = useWorkspace();
 
   const [openCollectionId, setOpenCollectionId] = useState<number | null>(null);
+  const [collectionItemsById, setCollectionItemsById] = useState
+    Record<number, Content[]>
+  >({});
 
-  //this is the content for the currently expanded collection, loaded from the API
+  const [selectedTessera, setSelectedTessera] = useState<Content | null>(null);
+  const [selectedCollection, setSelectedCollection] =
+    useState<Collection | null>(null);
 
-  const [openCollectionContent, setOpenCollectionContent] = useState<Content[]>([]);
-  const [loadingContent, setLoadingContent] =useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [newCollectionDescription, setNewCollectionDescription] = useState("");
+  const [formWarning, setFormWarning] = useState("");
 
-  const [selectedTessera, setSelectedTessera]=useState<Content | null>(null);
-
-  const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
-
-  const [showCreateModal, setShowCreateModal]= useState(false);
-  const [newCollectionName, setNewCollectionName]= useState("");
-  const [newCollectionDescription, setNewCollectionDescription] =useState("");
-  const [modalError, setModalError] =useState("");
-
-  //load a collection's content whenever it gets expanded
-  useEffect(() => {
-    if (openCollectionId === null) {
-      setOpenCollectionContent([]);
-      return;
-    }
-
-    setLoadingContent(true);
-    getCollectionContent(openCollectionId)
-      .then((data) => setOpenCollectionContent(data))
-      .catch((err) => {
-        console.error("Failed to load collection content:", err);
-        setOpenCollectionContent([]);
-      })
-      .finally(() => setLoadingContent(false));
-  }, [openCollectionId]);
-
-  const createCollection = async () => {
-    if (newCollectionName.trim() === "" || !currentWorkspace) return;
-
-    setModalError("");
-
+  const loadCollectionItems = async (collectionId: number) => {
     try {
-      const newCollection = await apiCreateCollection({
-        WorkspaceID: currentWorkspace.WorkspaceID,
-        CollectionName: newCollectionName.trim(),
-        Description: newCollectionDescription.trim(),
-      });
+      const items = await apiRequest(`/api/collections/${collectionId}/content`);
 
-      await refreshWorkspaceData();
-      setOpenCollectionId(newCollection.CollectionID);
-      setNewCollectionName("");
-
-      setNewCollectionDescription("");
-      setShowCreateModal(false);
+      setCollectionItemsById((currentItems) => ({
+        ...currentItems,
+        [collectionId]: items,
+      }));
     } catch (err) {
-      console.error("Failed to create collection:", err);
-      setModalError("Failed to create collection. Please try again.");
+      console.error("Failed to load collection content:", err);
     }
   };
 
-  const deleteCollection = async (collectionId: number) => {
-    const collection = collections.find(
-      (item) => item.CollectionID === collectionId
-    );
+  const toggleCollection = async (collectionId: number) => {
+    const isOpen = openCollectionId === collectionId;
 
-    if (!collection) return;
+    if (isOpen) {
+      setOpenCollectionId(null);
+      return;
+    }
 
+    setOpenCollectionId(collectionId);
+    await loadCollectionItems(collectionId);
+  };
+
+  const createCollection = async () => {
+    if (newCollectionName.trim() === "") {
+      setFormWarning("Collection name is required.");
+      return;
+    }
+
+    if (!currentWorkspace) {
+      setFormWarning("Select a workspace before creating a collection.");
+      return;
+    }
+
+    try {
+      const newCollection = await apiRequest("/api/collections", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          WorkspaceID: currentWorkspace.WorkspaceID,
+          CollectionName: newCollectionName.trim(),
+          Description: newCollectionDescription.trim(),
+        }),
+      });
+
+      await refreshWorkspaceData();
+
+      setOpenCollectionId(newCollection.CollectionID);
+      setCollectionItemsById((currentItems) => ({
+        ...currentItems,
+        [newCollection.CollectionID]: [],
+      }));
+
+      setNewCollectionName("");
+      setNewCollectionDescription("");
+      setFormWarning("");
+      setShowCreateModal(false);
+    } catch (err) {
+      console.error("Failed to create collection:", err);
+      setFormWarning("Failed to create collection. Please try again.");
+    }
+  };
+
+  const deleteCollection = async (collection: Collection) => {
     const confirmed = confirm(
       `Are you sure you want to delete "${collection.CollectionName}"?`
     );
@@ -84,13 +107,39 @@ function LeftSidebar() {
     if (!confirmed) return;
 
     try {
-      await apiDeleteCollection(collectionId);
+      await apiRequest(`/api/collections/${collection.CollectionID}`, {
+        method: "DELETE",
+      });
+
       await refreshWorkspaceData();
 
-      setOpenCollectionId(null);
+      setCollectionItemsById((currentItems) => {
+        const updatedItems = { ...currentItems };
+        delete updatedItems[collection.CollectionID];
+        return updatedItems;
+      });
+
+      if (openCollectionId === collection.CollectionID) {
+        setOpenCollectionId(null);
+      }
+
+      if (selectedCollection?.CollectionID === collection.CollectionID) {
+        setSelectedTessera(null);
+        setSelectedCollection(null);
+      }
     } catch (err) {
       console.error("Failed to delete collection:", err);
     }
+  };
+
+  const handleRemoveFromCollection = async () => {
+    if (!selectedCollection) return;
+
+    await loadCollectionItems(selectedCollection.CollectionID);
+    await refreshWorkspaceData();
+
+    setSelectedTessera(null);
+    setSelectedCollection(null);
   };
 
   return (
@@ -104,15 +153,15 @@ function LeftSidebar() {
         <div className="file-tree">
           {collections.map((collection) => {
             const isOpen = openCollectionId === collection.CollectionID;
+            const collectionItems =
+              collectionItemsById[collection.CollectionID] || [];
 
             return (
               <div className="collection-block" key={collection.CollectionID}>
                 <button
                   className={isOpen ? "folder-row active-folder" : "folder-row"}
                   title={collection.Description || "No description"}
-                  onClick={() =>
-                    setOpenCollectionId(isOpen ? null : collection.CollectionID)
-                  }
+                  onClick={() => toggleCollection(collection.CollectionID)}
                 >
                   <span className="chevron">{isOpen ? "▾" : "▸"}</span>
                   <span className="collection-name">
@@ -122,10 +171,8 @@ function LeftSidebar() {
 
                 {isOpen && (
                   <div className="collection-details">
-                    {loadingContent ? (
-                      <p className="empty-collection">Loading...</p>
-                    ) : openCollectionContent.length > 0 ? (
-                      openCollectionContent.map((item) => (
+                    {collectionItems.length > 0 ? (
+                      collectionItems.map((item) => (
                         <button
                           className="collection-content-row"
                           key={item.ContentID}
@@ -145,7 +192,7 @@ function LeftSidebar() {
 
                     <button
                       className="delete-collection-button"
-                      onClick={() => deleteCollection(collection.CollectionID)}
+                      onClick={() => deleteCollection(collection)}
                     >
                       Delete collection
                     </button>
@@ -165,7 +212,10 @@ function LeftSidebar() {
             <label>Collection name</label>
             <input
               value={newCollectionName}
-              onChange={(e) => setNewCollectionName(e.target.value)}
+              onChange={(e) => {
+                setNewCollectionName(e.target.value);
+                setFormWarning("");
+              }}
             />
 
             <label>Description</label>
@@ -174,7 +224,7 @@ function LeftSidebar() {
               onChange={(e) => setNewCollectionDescription(e.target.value)}
             />
 
-            {modalError && <p className="form-warning">{modalError}</p>}
+            {formWarning && <p className="form-warning">{formWarning}</p>}
 
             <div className="modal-actions">
               <button
@@ -182,7 +232,7 @@ function LeftSidebar() {
                   setShowCreateModal(false);
                   setNewCollectionName("");
                   setNewCollectionDescription("");
-                  setModalError("");
+                  setFormWarning("");
                 }}
               >
                 Cancel
@@ -202,18 +252,7 @@ function LeftSidebar() {
             setSelectedTessera(null);
             setSelectedCollection(null);
           }}
-          onRemoveFromCollection={async () => {
-            if (openCollectionId !== null) {
-              try {
-                const data = await getCollectionContent(openCollectionId);
-                setOpenCollectionContent(data);
-              } catch (err) {
-                console.error(err);
-              }
-            }
-            setSelectedTessera(null);
-            setSelectedCollection(null);
-          }}
+          onRemoveFromCollection={handleRemoveFromCollection}
         />
       )}
     </>

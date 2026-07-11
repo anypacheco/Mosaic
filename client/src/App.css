@@ -655,6 +655,60 @@ button {
   width: 100%;
 }
 
+.tessera-modal-controls {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 22px;
+  pointer-events: none;
+}
+
+.tessera-modal-controls button {
+  pointer-events: auto;
+}
+
+.close-tessera-button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid #33415c;
+  background: #111827;
+  color: #e5e7eb;
+  border-radius: 10px;
+  font-size: 1.4rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.close-tessera-button:hover {
+  background: #1f2937;
+}
+
+.tessera-modal-controls .delete-tessera-button {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #fb7185;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.tessera-modal-controls .delete-tessera-button:hover {
+  background: rgba(248, 113, 113, 0.16);
+  border-color: #fb7185;
+  color: #fecdd3;
+}
+
 /* CENTER */
 
 .content-area {
