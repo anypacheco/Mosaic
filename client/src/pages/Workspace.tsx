@@ -22,7 +22,9 @@ function Workspace({ currentView }: WorkspaceProps) {
           position: "relative", 
           width: "100%", 
           height: "100%",
+          overflow: "hidden", // Keeps structural frame tight, inner views handle scroll
           minHeight: "500px" // Fallback safety minimum bounds
+          
         }}
       >
         {currentView === "graph" ? <GraphView /> : <MosaicView />}
