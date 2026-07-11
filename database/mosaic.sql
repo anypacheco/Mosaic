@@ -1,9 +1,8 @@
-DROP DATABASE IF EXISTS Mosaic;
-CREATE DATABASE Mosaic;
+CREATE DATABASE IF NOT EXISTS Mosaic;
 USE Mosaic;
 
 
-CREATE TABLE Workspace (
+CREATE TABLE IF NOT EXISTS Workspace (
     WorkspaceID INT AUTO_INCREMENT,
     WorkspaceName VARCHAR(100) NOT NULL,
     Description TEXT,
@@ -12,7 +11,7 @@ CREATE TABLE Workspace (
     UNIQUE (WorkspaceName)
 );
 
-CREATE TABLE Collection (
+CREATE TABLE IF NOT EXISTS Collection (
     CollectionID INT AUTO_INCREMENT,
     WorkspaceID INT NOT NULL,
     CollectionName VARCHAR(100) NOT NULL,
@@ -25,7 +24,7 @@ CREATE TABLE Collection (
     UNIQUE (WorkspaceID, CollectionName)
 );
 
-CREATE TABLE Content (
+CREATE TABLE IF NOT EXISTS Content (
     ContentID INT AUTO_INCREMENT,
     WorkspaceID INT NOT NULL,
     Title VARCHAR(255) NOT NULL,
@@ -44,7 +43,7 @@ CREATE TABLE Content (
     CHECK (FilePath IS NOT NULL OR TextContent IS NOT NULL)
 );
 
-CREATE TABLE Tag (
+CREATE TABLE IF NOT EXISTS Tag (
     TagID INT AUTO_INCREMENT,
     WorkspaceID INT NOT NULL,
     TagName VARCHAR(100) NOT NULL,
@@ -57,7 +56,7 @@ CREATE TABLE Tag (
     CHECK (HexColor REGEXP '^#[0-9A-Fa-f]{6}$')
 );
 
-CREATE TABLE Saved_Search (
+CREATE TABLE IF NOT EXISTS Saved_Search (
     SavedSearchID INT AUTO_INCREMENT,
     WorkspaceID INT NOT NULL,
     SearchName VARCHAR(100) NOT NULL,
@@ -70,7 +69,7 @@ CREATE TABLE Saved_Search (
     UNIQUE (WorkspaceID, SearchName)
 );
 
-CREATE TABLE Snapshot (
+CREATE TABLE IF NOT EXISTS Snapshot (
     SnapshotID INT AUTO_INCREMENT,
     WorkspaceID INT NOT NULL,
     SnapshotName VARCHAR(100) NOT NULL,
@@ -82,7 +81,7 @@ CREATE TABLE Snapshot (
         ON DELETE CASCADE
 );
 
-CREATE TABLE File_Metadata (
+CREATE TABLE IF NOT EXISTS File_Metadata (
     MetadataID INT AUTO_INCREMENT,
     ContentID INT NOT NULL,
     FileSize BIGINT NOT NULL,
@@ -96,7 +95,7 @@ CREATE TABLE File_Metadata (
     CHECK (FileSize >= 0)
 );
 
-CREATE TABLE Content_Search_Index (
+CREATE TABLE IF NOT EXISTS Content_Search_Index (
     SearchIndexID INT AUTO_INCREMENT,
     ContentID INT NOT NULL,
     ExtractedText LONGTEXT,
@@ -108,7 +107,7 @@ CREATE TABLE Content_Search_Index (
         ON DELETE CASCADE
 );
 
-CREATE TABLE Collection_Content (
+CREATE TABLE IF NOT EXISTS Collection_Content (
     CollectionID INT,
     ContentID INT,
     AddedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -121,7 +120,7 @@ CREATE TABLE Collection_Content (
         ON DELETE CASCADE
 );
 
-CREATE TABLE Content_Tag (
+CREATE TABLE IF NOT EXISTS Content_Tag (
     ContentID INT,
     TagID INT,
     PRIMARY KEY (ContentID, TagID),
@@ -133,7 +132,7 @@ CREATE TABLE Content_Tag (
         ON DELETE CASCADE
 );
 
-CREATE TABLE SavedSearch_Tag (
+CREATE TABLE IF NOT EXISTS SavedSearch_Tag (
     SavedSearchID INT,
     TagID INT,
     PRIMARY KEY (SavedSearchID, TagID),
@@ -145,7 +144,7 @@ CREATE TABLE SavedSearch_Tag (
         ON DELETE CASCADE
 );
 
-CREATE TABLE Snapshot_Content (
+CREATE TABLE IF NOT EXISTS Snapshot_Content (
     SnapshotID INT,
     ContentID INT,
     PRIMARY KEY (SnapshotID, ContentID),

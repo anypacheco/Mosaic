@@ -195,6 +195,42 @@ export function getCollectionContent(collectionId: number): Promise<Content[]> {
   return getJSON<Content[]>(`${API_BASE}/collections/${collectionId}/content`);
 }
 
+export function createCollection(data: {
+  WorkspaceID: number;
+  CollectionName: string;
+  Description?: string;
+}): Promise<Collection> 
+{
+  return postJSON<Collection>(`${API_BASE}/collections`, data);
+}
+
+export function deleteCollection(
+  collectionId: number
+): Promise<{ success: boolean }> {
+  return deleteJSON<{ success: boolean }>(
+    `${API_BASE}/collections/${collectionId}`
+  );
+}
+
+export function addContentToCollection(
+  collectionId: number,
+  contentId: number
+): Promise<{ CollectionID: number; ContentID: number }> {
+  return postJSON(
+    `${API_BASE}/collections/${collectionId}/content/${contentId}`,
+    {}
+  );
+}
+
+export function removeContentFromCollection(
+  collectionId: number,
+  contentId: number
+): Promise<{ success: boolean }> {
+  return deleteJSON<{ success: boolean }>(
+    `${API_BASE}/collections/${collectionId}/content/${contentId}`
+  );
+}
+
 // saved searches
 
 export function getWorkspaceSavedSearches(

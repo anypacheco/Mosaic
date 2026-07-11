@@ -1,43 +1,77 @@
-import { useState } from "react";
-import { collections, collectionContent, content } from "../data/mockData";
+import { useEffect, useState } from "react";
+import { useWorkspace } from "../context/WorkspaceContext";
+import {
+  createCollection as apiCreateCollection,
+  deleteCollection as apiDeleteCollection,
+  getCollectionContent,
+  type Collection,
+  type Content,
+} from "../api/client";
 import TesseraDetail from "./TesseraDetail";
 
 function LeftSidebar() {
-  const [localCollections, setLocalCollections] = useState(collections);
-  const [localCollectionContent, setLocalCollectionContent] =
-    useState(collectionContent);
+  const { collections, currentWorkspace, refreshWorkspaceData } =
+    useWorkspace();
+
   const [openCollectionId, setOpenCollectionId] = useState<number | null>(null);
-  const [selectedTessera, setSelectedTessera] = useState<
-    (typeof content)[number] | null
-  >(null);
-  const [selectedCollectionId, setSelectedCollectionId] = useState<
-    number | null
-  >(null);
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newCollectionName, setNewCollectionName] = useState("");
-  const [newCollectionDescription, setNewCollectionDescription] = useState("");
+  //this is the content for the currently expanded collection, loaded from the API
 
-  const createCollection = () => {
-    if (newCollectionName.trim() === "") return;
+  const [openCollectionContent, setOpenCollectionContent] = useState<Content[]>([]);
+  const [loadingContent, setLoadingContent] =useState(false);
 
-    const newCollection = {
-      CollectionID: Date.now(),
-      WorkspaceID: 1,
-      CollectionName: newCollectionName.trim(),
-      Description: newCollectionDescription.trim(),
-      CreatedAt: new Date().toISOString(),
-    };
+  const [selectedTessera, setSelectedTessera]=useState<Content | null>(null);
 
-    setLocalCollections([...localCollections, newCollection]);
-    setOpenCollectionId(newCollection.CollectionID);
-    setNewCollectionName("");
-    setNewCollectionDescription("");
-    setShowCreateModal(false);
+  const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
+
+  const [showCreateModal, setShowCreateModal]= useState(false);
+  const [newCollectionName, setNewCollectionName]= useState("");
+  const [newCollectionDescription, setNewCollectionDescription] =useState("");
+  const [modalError, setModalError] =useState("");
+
+  //load a collection's content whenever it gets expanded
+  useEffect(() => {
+    if (openCollectionId === null) {
+      setOpenCollectionContent([]);
+      return;
+    }
+
+    setLoadingContent(true);
+    getCollectionContent(openCollectionId)
+      .then((data) => setOpenCollectionContent(data))
+      .catch((err) => {
+        console.error("Failed to load collection content:", err);
+        setOpenCollectionContent([]);
+      })
+      .finally(() => setLoadingContent(false));
+  }, [openCollectionId]);
+
+  const createCollection = async () => {
+    if (newCollectionName.trim() === "" || !currentWorkspace) return;
+
+    setModalError("");
+
+    try {
+      const newCollection = await apiCreateCollection({
+        WorkspaceID: currentWorkspace.WorkspaceID,
+        CollectionName: newCollectionName.trim(),
+        Description: newCollectionDescription.trim(),
+      });
+
+      await refreshWorkspaceData();
+      setOpenCollectionId(newCollection.CollectionID);
+      setNewCollectionName("");
+
+      setNewCollectionDescription("");
+      setShowCreateModal(false);
+    } catch (err) {
+      console.error("Failed to create collection:", err);
+      setModalError("Failed to create collection. Please try again.");
+    }
   };
 
-  const deleteCollection = (collectionId: number) => {
-    const collection = localCollections.find(
+  const deleteCollection = async (collectionId: number) => {
+    const collection = collections.find(
       (item) => item.CollectionID === collectionId
     );
 
@@ -49,30 +83,14 @@ function LeftSidebar() {
 
     if (!confirmed) return;
 
-    setLocalCollections(
-      localCollections.filter((item) => item.CollectionID !== collectionId)
-    );
+    try {
+      await apiDeleteCollection(collectionId);
+      await refreshWorkspaceData();
 
-    setLocalCollectionContent(
-      localCollectionContent.filter((link) => link.CollectionID !== collectionId)
-    );
-
-    setOpenCollectionId(null);
-  };
-
-  const removeContentFromCollection = (
-    collectionId: number,
-    contentId: number
-  ) => {
-    setLocalCollectionContent(
-      localCollectionContent.filter(
-        (link) =>
-          !(link.CollectionID === collectionId && link.ContentID === contentId)
-      )
-    );
-
-    setSelectedTessera(null);
-    setSelectedCollectionId(null);
+      setOpenCollectionId(null);
+    } catch (err) {
+      console.error("Failed to delete collection:", err);
+    }
   };
 
   return (
@@ -84,15 +102,8 @@ function LeftSidebar() {
         </div>
 
         <div className="file-tree">
-          {localCollections.map((collection) => {
+          {collections.map((collection) => {
             const isOpen = openCollectionId === collection.CollectionID;
-
-            const collectionItems = localCollectionContent
-              .filter((link) => link.CollectionID === collection.CollectionID)
-              .map((link) =>
-                content.find((item) => item.ContentID === link.ContentID)
-              )
-              .filter(Boolean);
 
             return (
               <div className="collection-block" key={collection.CollectionID}>
@@ -111,23 +122,23 @@ function LeftSidebar() {
 
                 {isOpen && (
                   <div className="collection-details">
-                    {collectionItems.length > 0 ? (
-                      collectionItems.map((item) =>
-                        item ? (
-                          <button
-                            className="collection-content-row"
-                            key={item.ContentID}
-                            onClick={() => {
-                              setSelectedTessera(item);
-                              setSelectedCollectionId(collection.CollectionID);
-                            }}
-                          >
-                            <span className="classic-file-name">
-                              {item.Title}
-                            </span>
-                          </button>
-                        ) : null
-                      )
+                    {loadingContent ? (
+                      <p className="empty-collection">Loading...</p>
+                    ) : openCollectionContent.length > 0 ? (
+                      openCollectionContent.map((item) => (
+                        <button
+                          className="collection-content-row"
+                          key={item.ContentID}
+                          onClick={() => {
+                            setSelectedTessera(item);
+                            setSelectedCollection(collection);
+                          }}
+                        >
+                          <span className="classic-file-name">
+                            {item.Title}
+                          </span>
+                        </button>
+                      ))
                     ) : (
                       <p className="empty-collection">No tesserae yet</p>
                     )}
@@ -163,12 +174,15 @@ function LeftSidebar() {
               onChange={(e) => setNewCollectionDescription(e.target.value)}
             />
 
+            {modalError && <p className="form-warning">{modalError}</p>}
+
             <div className="modal-actions">
               <button
                 onClick={() => {
                   setShowCreateModal(false);
                   setNewCollectionName("");
                   setNewCollectionDescription("");
+                  setModalError("");
                 }}
               >
                 Cancel
@@ -180,22 +194,26 @@ function LeftSidebar() {
         </div>
       )}
 
-      {selectedTessera && selectedCollectionId && (
+      {selectedTessera && selectedCollection && (
         <TesseraDetail
           tessera={selectedTessera}
-          collection={localCollections.find(
-            (collection) => collection.CollectionID === selectedCollectionId
-          )}
+          collection={selectedCollection}
           onClose={() => {
             setSelectedTessera(null);
-            setSelectedCollectionId(null);
+            setSelectedCollection(null);
           }}
-          onRemoveFromCollection={() =>
-            removeContentFromCollection(
-              selectedCollectionId,
-              selectedTessera.ContentID
-            )
-          }
+          onRemoveFromCollection={async () => {
+            if (openCollectionId !== null) {
+              try {
+                const data = await getCollectionContent(openCollectionId);
+                setOpenCollectionContent(data);
+              } catch (err) {
+                console.error(err);
+              }
+            }
+            setSelectedTessera(null);
+            setSelectedCollection(null);
+          }}
         />
       )}
     </>

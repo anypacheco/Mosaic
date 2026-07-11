@@ -262,6 +262,44 @@ app.get('/api/workspaces/:workspaceId/collections', async (req, res) => {
     }
 });
 
+//post create a new collection
+app.post('/api/collections', async (req, res) => {
+    try {
+        const { WorkspaceID, CollectionName, Description } = req.body;
+        if (!WorkspaceID || !CollectionName) {
+            return res.status(400).json({ error: 'WorkspaceID and CollectionName are required' });
+        }
+        const result = await db.query(
+            'INSERT INTO Collection (WorkspaceID, CollectionName, Description) VALUES (?, ?, ?)',
+            [WorkspaceID, CollectionName, Description || null]
+        );
+        res.status(201).json({
+            CollectionID: result.insertId,
+            WorkspaceID,
+            CollectionName,
+            Description: Description || null,
+        });
+    } catch (error) {
+        console.error('Error creating collection:', error);
+        res.status(500).json({ error: 'Failed to create collection' });
+    }
+});
+
+//delete a collection (cascades to its Collection_Content links)
+app.delete('/api/collections/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await db.query('DELETE FROM Collection WHERE CollectionID = ?', [id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Collection not found' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting collection:', error);
+        res.status(500).json({ error: 'Failed to delete collection' });
+    }
+});
+
 // GET collection with its content
 app.get('/api/collections/:id/content', async (req, res) => {
     try {
