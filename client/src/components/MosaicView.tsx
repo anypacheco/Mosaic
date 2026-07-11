@@ -7,7 +7,7 @@ import {
   FaVideo,
 } from "react-icons/fa";
 import { useWorkspace } from "../context/WorkspaceContext";
-import { getWorkspaceContent, type Content } from "../api/client"; // Clean centralized imports!
+import { getWorkspaceContent, type Content } from "../api/client";
 import TesseraDetail from "./TesseraDetail";
 
 function getTileClass(contentType: string) {
@@ -35,7 +35,7 @@ function getPreviewIcon(contentType: string) {
 }
 
 function MosaicView() {
-  const { currentWorkspace } = useWorkspace();
+  const { currentWorkspace, refreshWorkspaceData } = useWorkspace();
   const workspaceId = currentWorkspace?.WorkspaceID || 1;
 
   const [contentList, setContentList] = useState<Content[]>([]);
@@ -43,32 +43,52 @@ function MosaicView() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchMosaicContent() {
-      try {
-        setLoading(true);
-        setError(null);
+  const fetchMosaicContent = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        // Using your central API layer helper method!
-        const data = await getWorkspaceContent(workspaceId);
-        setContentList(data);
-      } catch (err) {
-        console.error("Error reading project mosaic database stream:", err);
-        setError("Unable to interface with dynamic workspace material matrix.");
-      } finally {
-        setLoading(false);
-      }
+      const data = await getWorkspaceContent(workspaceId);
+      setContentList(data);
+    } catch (err) {
+      console.error("Error loading mosaic content:", err);
+      setError("Unable to load mosaic content.");
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     fetchMosaicContent();
   }, [workspaceId]);
 
-  if (loading) return <div style={{ padding: "20px", color: "var(--text)" }}>Arranging your digital mosaic grid...</div>;
-  if (error) return <div style={{ padding: "20px", color: "red" }}>{error}</div>;
+  const handleCloseTessera = async () => {
+    await refreshWorkspaceData();
+    await fetchMosaicContent();
+    setSelectedTessera(null);
+  };
+
+  if (loading) {
+    return (
+      <div style={{ padding: "20px", color: "var(--text)" }}>
+        Arranging your digital mosaic grid...
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div style={{ padding: "20px", color: "red" }}>{error}</div>;
+  }
 
   if (contentList.length === 0) {
     return (
-      <div style={{ padding: "40px", textAlign: "center", color: "var(--text)" }}>
+      <div
+        style={{
+          padding: "40px",
+          textAlign: "center",
+          color: "var(--text)",
+        }}
+      >
         <h3>Your Mosaic is completely clear!</h3>
         <p>Click "+ Add Tessera" below to save your first piece of inspiration.</p>
       </div>
@@ -105,8 +125,8 @@ function MosaicView() {
       {selectedTessera && (
         <TesseraDetail
           tessera={selectedTessera}
-          onClose={() => setSelectedTessera(null)}
-          onRemoveFromCollection={() => {}}
+          onClose={handleCloseTessera}
+          onRemoveFromCollection={handleCloseTessera}
         />
       )}
     </>

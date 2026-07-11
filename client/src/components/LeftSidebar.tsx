@@ -19,8 +19,9 @@ function LeftSidebar() {
   const { currentWorkspace, collections, refreshWorkspaceData } = useWorkspace();
 
   const [openCollectionId, setOpenCollectionId] = useState<number | null>(null);
-
-  const [collectionItemsById, setCollectionItemsById] = useState<Record<number, Content[]>>({});
+  const [collectionItemsById, setCollectionItemsById] = useState<
+    Record<number, Content[]>
+  >({});
 
   const [selectedTessera, setSelectedTessera] = useState<Content | null>(null);
   const [selectedCollection, setSelectedCollection] =
@@ -129,6 +130,17 @@ function LeftSidebar() {
     } catch (err) {
       console.error("Failed to delete collection:", err);
     }
+  };
+
+  const handleCloseTessera = async () => {
+    if (selectedCollection) {
+      await loadCollectionItems(selectedCollection.CollectionID);
+    }
+
+    await refreshWorkspaceData();
+
+    setSelectedTessera(null);
+    setSelectedCollection(null);
   };
 
   const handleRemoveFromCollection = async () => {
@@ -247,10 +259,7 @@ function LeftSidebar() {
         <TesseraDetail
           tessera={selectedTessera}
           collection={selectedCollection}
-          onClose={() => {
-            setSelectedTessera(null);
-            setSelectedCollection(null);
-          }}
+          onClose={handleCloseTessera}
           onRemoveFromCollection={handleRemoveFromCollection}
         />
       )}
