@@ -27,6 +27,24 @@ async function apiRequest(path: string, options?: RequestInit) {
   return response.json();
 }
 
+function formatDate(dateValue: string | null | undefined) {
+  if (!dateValue) return "Not available";
+
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return dateValue;
+  }
+
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function TesseraDetail({
   tessera,
   collection,
@@ -392,6 +410,7 @@ function TesseraDetail({
           >
             <FaTrash />
           </button>
+
           <button
             className="close-tessera-button"
             onClick={handleClose}
@@ -543,10 +562,14 @@ function TesseraDetail({
             )}
 
             <div className="tessera-property-label">Created</div>
-            <div className="read-only-property">{tessera.CreatedAt}</div>
+            <div className="read-only-property">
+              {formatDate(tessera.CreatedAt)}
+            </div>
 
             <div className="tessera-property-label">Modified</div>
-            <div className="read-only-property">{tessera.ModifiedAt}</div>
+            <div className="read-only-property">
+              {formatDate(tessera.ModifiedAt)}
+            </div>
           </div>
 
           <div className="tessera-content-widget">
