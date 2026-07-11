@@ -52,9 +52,16 @@ export function createGraphData(
   });
 
   // 3. Map Connections
-  const workspaceContentIds = workspaceContent.map((item) => item.ContentID);
+  const workspaceContentIds = new Set(
+    workspaceContent.map((item) => item.ContentID)
+  );
+  const workspaceTagIds = new Set(workspaceTags.map((tag) => tag.TagID));
+
   contentTagsList.forEach((connection) => {
-    if (workspaceContentIds.includes(connection.ContentID)) {
+    if (
+      workspaceContentIds.has(connection.ContentID) &&
+      workspaceTagIds.has(connection.TagID)
+    ) {
       edges.push({
         id: `edge-${connection.ContentID}-${connection.TagID}`,
         source: `content-${connection.ContentID}`,
